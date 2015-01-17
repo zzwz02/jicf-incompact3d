@@ -56,6 +56,7 @@ integer,parameter :: nstat=1,nvisu=1
 integer,parameter :: p_row=0,p_col=0
 integer,parameter :: nxm=nx-1,nym=ny-1,nzm=nz
 real,parameter :: rjicf=1.0,v_jicf=1./6.  !0.
+! integer,parameter :: KL=2,KU=2,LDAB=2*KL+KU+1
 !end module variables
 
 !module filter
@@ -88,6 +89,12 @@ real(mytype), dimension(ny) :: sfyt,scyt,sbyt,ssyt,swyt
 real(mytype), dimension(ny) :: sfypt,ssypt,swypt
 real(mytype), dimension(nz) :: sfzt,sczt,sbzt,sszt,swzt
 real(mytype), dimension(nz) :: sfzpt,sszpt,swzpt
+!!my own scalar subroutine.
+! real(mytype), dimension(ny) :: scalar_a,scalar_b
+! real(mytype), dimension(ny,ny) :: scalar_c,scalar_d
+! real(mytype), dimension(LDAB,ny) :: AB
+real(mytype), dimension(2*ny,2*ny) :: scalar_left
+!real(mytype), dimension(ny) :: fbyt,fcyt,ffyt,fsyt,fwyt
 
 !module implicit
 real(mytype), dimension(ny) :: aam,bbm,ccm,ddm,eem,ggm,hhm,wwm,zzm !!TIME IMPLICIT, ncl=2

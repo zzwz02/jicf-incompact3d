@@ -104,6 +104,7 @@ read (10,1000) a
 read (10,1000) a 
 read (10,1000) a 
 read (10,*) print_interval
+read (10,*) iimplicit
 read (10,1000) a 
 close(10) 
 if (nrank==0) then

@@ -63,9 +63,12 @@ call parameter()
 call init_variables
 
 !DEVELOPPEMENT A PLACER DANS incompact3d.prm
-iimplicit=0
+!iimplicit=0
 !iimplicit=iscalar
-if (nrank.eq.0) print *,'Parametre implicite : ',iimplicit
+if (nrank.eq.0) then 
+  if (iimplicit.eq.0) print *,'Explicit/Semi-implicit Parametre: Explicit'
+  if (iimplicit.eq.1) print *,'Explicit/Semi-implicit Parametre: Semi-implicit'
+endif
 
 call schemes()
 
@@ -139,7 +142,7 @@ if (diverge==0) then
 
       if (nclx.eq.2) then
          call inflow (ux1,uy1,uz1,phi1) !X PENCILS
-         call outflow(ux1,uy1,uz1,phi1) !X PENCILS 
+         call outflow(ux1,uy1,uz1,phi1) !X PENCILS
       endif
 
      !X-->Y-->Z-->Y-->X
@@ -167,7 +170,7 @@ if (diverge==0) then
       !X-->Y-->Z
       call divergence (ux1,uy1,uz1,ep1,ta1,tb1,tc1,di1,td1,te1,tf1,&
            td2,te2,tf2,di2,ta2,tb2,tc2,ta3,tb3,tc3,di3,td3,te3,tf3,pp3,&
-           nxmsize,nymsize,nzmsize,ph1,ph3,ph4,1)       
+           nxmsize,nymsize,nzmsize,ph1,ph3,ph4,1)
 
       !POISSON Z-->Z 
       call decomp_2d_poisson_stg(pp3,bcx,bcy,bcz)
@@ -186,7 +189,9 @@ if (diverge==0) then
 
       if (iscalar==1) then
          if(iimplicit==0) then
-         call scalar(ux1,uy1,uz1,phi1,phis1,phiss1,di1,tg1,th1,ti1,td1,&
+	    !call scalar(ux1,uy1,uz1,phi1,phis1,phiss1,di1,tg1,th1,ti1,td1,&
+            !  uy2,uz2,phi2,di2,ta2,tb2,tc2,td2,uz3,phi3,di3,ta3,tb3,ep1) 
+	    call scalar_exp(ux1,uy1,uz1,phi1,phis1,phiss1,di1,tg1,th1,ti1,td1,&
               uy2,uz2,phi2,di2,ta2,tb2,tc2,td2,uz3,phi3,di3,ta3,tb3,ep1) 
          else
             call scalarimp(ux1,uy1,uz1,phi1,phis1,phiss1,di1,tg1,th1,ti1,td1,&
@@ -194,13 +199,11 @@ if (diverge==0) then
          endif
       endif
            
-!      if (itr==iadvance_time) then
-!        t=itime*dt
-      if (print_flag==1) then
+      if (print_flag==1 .and. itr==iadvance_time) then
+        t=itime*dt
         call test_speed_min_max(ux1,uy1,uz1)
         if (iscalar==1) call test_scalar_min_max(phi1)
       endif
-!      endif
 
    enddo
 
@@ -241,7 +244,7 @@ if (nrank==0) print *,'simulation with nx*ny*nz=',nx,ny,nz,'mesh nodes'
 if (nrank==0) print *,'Mapping p_row*p_col=',p_row,p_col
 if (diverge==1 .and. nrank==0) print *,'Diverged!!!'
 
-!call decomp_2d_poisson_finalize
+call decomp_2d_poisson_finalize
 call decomp_2d_finalize
 CALL MPI_FINALIZE(code)
 

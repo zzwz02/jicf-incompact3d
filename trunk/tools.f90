@@ -37,7 +37,7 @@ subroutine test_scalar_min_max(phi)
 !*******************************************************************
 
 USE decomp_2d
-USE decomp_2d_poisson
+!USE decomp_2d_poisson
 USE variables
 USE param
 USE var
@@ -70,7 +70,6 @@ enddo
 enddo
 enddo
 
-
 call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
 call MPI_REDUCE(phimin,phimin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,code)
 if (nrank==0) print *,'PHI max=',phimax1,'PHI min=',phimin1
@@ -90,7 +89,7 @@ subroutine test_speed_min_max(ux,uy,uz)
 !*******************************************************************
 
 USE decomp_2d
-USE decomp_2d_poisson
+!USE decomp_2d_poisson
 USE variables
 USE param
 USE var
@@ -124,7 +123,6 @@ do i=1,xsize(1)
 enddo
 enddo
 enddo
-
 
 call MPI_REDUCE(uxmax,uxmax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
 call MPI_REDUCE(uymax,uymax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
@@ -447,7 +445,7 @@ subroutine stretching()
 !*******************************************************************
 !
 USE decomp_2d
-USE decomp_2d_poisson
+!USE decomp_2d_poisson
 USE variables
 USE param
 USE var
@@ -594,7 +592,7 @@ subroutine inversion5_v1(aaa,eee,spI)
 !*****************************************************************
 
 USE decomp_2d
-USE decomp_2d_poisson
+!USE decomp_2d_poisson
 USE variables
 USE param
 USE var
@@ -737,7 +735,7 @@ subroutine inversion5_v2(aaa,eee,spI)
 !*****************************************************************
 
 USE decomp_2d
-USE decomp_2d_poisson
+!USE decomp_2d_poisson
 USE variables
 USE param
 USE var
@@ -873,7 +871,7 @@ end subroutine inversion5_v2
 
 !********************************************************************
 !
-subroutine channel (ux)
+subroutine channel (ux,phi)
 !
 !********************************************************************
 
@@ -886,7 +884,7 @@ USE MPI
 
 implicit none
 
-real(mytype),dimension(ysize(1),ysize(2),ysize(3)) :: ux
+real(mytype),dimension(ysize(1),ysize(2),ysize(3)) :: ux,phi
 
 integer :: j,i,k,code
 real(mytype) :: can,ut3,ut,ut4
@@ -911,7 +909,7 @@ ut4=ut4/nproc
 !can=-2.*xnu*gdt(itr) ! Poisseuille    
 can=-(1.-ut4) ! constant flow rate
 
-if (print_flag==1 .and. nrank==0) print *,nrank,'UT',ut4,can
+if (print_flag==1 .and. nrank==0) print *,'UT',ut4,can
 
 do k=1,ysize(3)
 do i=1,ysize(1)
@@ -920,6 +918,25 @@ do j=2,ny-1
 enddo
 enddo
 enddo
+
+if (iscalar==1) then ! Get averaged temperature
+   ut3=0.
+   do k=1,ysize(3)
+   do i=1,ysize(1)
+      ut=0.
+      do j=1,ny-1
+         if (istret.ne.0) ut=ut+(yp(j+1)-yp(j))*(phi(i,j+1,k)-0.5*(phi(i,j+1,k)-phi(i,j,k)))
+         if (istret.eq.0) ut=ut+(yly/(ny-1))*(phi(i,j+1,k)-0.5*(phi(i,j+1,k)-phi(i,j,k)))
+      enddo
+      ut=ut/yly
+      ut3=ut3+ut
+   enddo
+   enddo
+   call MPI_ALLREDUCE(ut3,ut4,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+   ut4=ut4/(nx*nz)
+   if (print_flag==1 .and. nrank==0) print *,'Averaged temperature: ',ut4
+   phi=phi-ut4
+endif
 
 return
 end subroutine channel
@@ -1043,7 +1060,7 @@ subroutine collect_data()
 !*****************************************************************
 
 USE decomp_2d
-USE decomp_2d_poisson
+!USE decomp_2d_poisson
 USE variables
 USE param
 USE var
