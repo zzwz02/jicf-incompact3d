@@ -52,9 +52,7 @@ real(mytype),dimension(zsize(1),zsize(2),zsize(3)) :: ux3,uy3,uz3
 real(mytype),dimension(zsize(1),zsize(2),zsize(3)) :: ta3,tb3,tc3,td3,te3,tf3,tg3,th3,ti3,di3
 
 integer :: ijk,nvect1,nvect2,nvect3,i,j,k
-real(mytype) :: x,y,z
-
-
+!real(mytype) :: x,y,z
 
 nvect1=xsize(1)*xsize(2)*xsize(3)
 nvect2=ysize(1)*ysize(2)*ysize(3)
@@ -229,32 +227,32 @@ else ! IMPLICIT
 if (istret.ne.0) then
 
 !-->for ux
-   call dery (te2,ux2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1)                                         
-   do k=1,ysize(3)                                                                                                    
-   do j=1,ysize(2)                                                                                                    
+   call dery (te2,ux2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1)
+   do k=1,ysize(3)
+   do j=1,ysize(2)
    do i=1,ysize(1)
-      td2(i,j,k)=-pp4y(j)*te2(i,j,k)                                                                
-   enddo                                                                                                              
-   enddo                                                                                                              
-   enddo                                                                                                              
+      td2(i,j,k)=-pp4y(j)*te2(i,j,k)
+   enddo
+   enddo
+   enddo
 !-->for uy
-   call dery (tf2,uy2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)                                            
-   do k=1,ysize(3)                                                                                                    
-   do j=1,ysize(2)                                                                                                    
+   call dery (tf2,uy2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)
+   do k=1,ysize(3)
+   do j=1,ysize(2)
    do i=1,ysize(1)
-      te2(i,j,k)=-pp4y(j)*tf2(i,j,k)                                                                
-   enddo                                                                                                              
-   enddo                                                                                                              
-   enddo                                                                                                              
+      te2(i,j,k)=-pp4y(j)*tf2(i,j,k)
+   enddo
+   enddo
+   enddo
 !-->for uz
-   call dery (tj2,uz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1)                                         
-   do k=1,ysize(3)                                                                                                    
-   do j=1,ysize(2)                                                                                                    
+   call dery (tj2,uz2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1)
+   do k=1,ysize(3)
+   do j=1,ysize(2)
    do i=1,ysize(1)
-      tf2(i,j,k)=-pp4y(j)*tj2(i,j,k)                                                                
-   enddo                                                                                                              
-   enddo                                                                                                              
-   enddo                                                                                                              
+      tf2(i,j,k)=-pp4y(j)*tj2(i,j,k)
+   enddo
+   enddo
+   enddo
 
 endif
 endif
@@ -337,21 +335,22 @@ call transpose_x_to_y(uz1,uz2)
 
 !Y PENCILS
 do ijk=1,nvect2
-   ta2(ijk,1,1)=uy2(ijk,1,1)*phi2(ijk,1,1)
+  ta2(ijk,1,1)=uy2(ijk,1,1)*phi2(ijk,1,1)
 enddo
 call dery (tb2,ta2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)
+
 if (istret.ne.0) then 
-   call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1)
-   call dery (tc2,phi2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)
-   do k=1,ysize(3)
-   do j=1,ysize(2)
-   do i=1,ysize(1)
-      ta2(i,j,k)=ta2(i,j,k)*pp2y(j)-pp4y(j)*tc2(i,j,k)
-   enddo
-   enddo
-   enddo
+  call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1)
+  call dery (tc2,phi2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)
+  do k=1,ysize(3)
+  do j=1,ysize(2)
+  do i=1,ysize(1)
+    ta2(i,j,k)=ta2(i,j,k)*pp2y(j)-pp4y(j)*tc2(i,j,k)
+  enddo
+  enddo
+  enddo
 else
-   call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1) 
+  call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1) 
 endif
 
 call transpose_y_to_z(phi2,phi3)

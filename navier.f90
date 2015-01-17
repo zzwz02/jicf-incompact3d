@@ -171,7 +171,7 @@ end subroutine intt
 
 !********************************************************************
 !
-subroutine corgp (ux,gx,uy,uz,px,py,pz)
+subroutine corgp (ux,gx,uy,uz,px,py,pz,phi)
 ! 
 !********************************************************************
 
@@ -184,20 +184,22 @@ USE MPI
 implicit none
 
 integer :: ijk,nxyz
-real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux,uy,uz,px,py,pz
-real(mytype),dimension(ysize(1),ysize(2),ysize(3)) :: gx
+real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux,uy,uz,px,py,pz,phi
+real(mytype),dimension(ysize(1),ysize(2),ysize(3)) :: gx,phi22
 
 nxyz=xsize(1)*xsize(2)*xsize(3)
 
 do ijk=1,nxyz
    ux(ijk,1,1)=-px(ijk,1,1)+ux(ijk,1,1)
-   uy(ijk,1,1)=-py(ijk,1,1)+uy(ijk,1,1) 
-   uz(ijk,1,1)=-pz(ijk,1,1)+uz(ijk,1,1) 
+   uy(ijk,1,1)=-py(ijk,1,1)+uy(ijk,1,1)
+   uz(ijk,1,1)=-pz(ijk,1,1)+uz(ijk,1,1)
 enddo
 
 if (itype==2) then !channel flow
    call transpose_x_to_y(ux,gx)
-   call channel(gx)
+   call transpose_x_to_y(phi,phi22)
+   call channel(gx,phi22)
+   call transpose_y_to_x(phi22,phi)
    call transpose_y_to_x(gx,ux)
 endif
 
@@ -232,7 +234,6 @@ endif
 
 if (itype.ne.5) then
    call ecoule(ux,uy,uz)
-
    call random_number(bxo)
    call random_number(byo)
    call random_number(bzo)
@@ -835,8 +836,8 @@ do k=1,xsize(3)
 do j=1,xsize(2)
    dpdyx1(j,k)=tb1(1,j,k)/gdt(itr)
    dpdzx1(j,k)=tc1(1,j,k)/gdt(itr)
-   dpdyxn(j,k)=tb1(nx,j,k)/gdt(itr)
-   dpdzxn(j,k)=tc1(nx,j,k)/gdt(itr)
+   dpdyxn(j,k)=tb1(xsize(1),j,k)/gdt(itr)
+   dpdzxn(j,k)=tc1(xsize(1),j,k)/gdt(itr)
 enddo
 enddo
 

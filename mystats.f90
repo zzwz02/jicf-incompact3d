@@ -376,7 +376,8 @@ end subroutine read_user_stats
 subroutine read_one_user_stat(filename,var)
 
   USE decomp_2d, only : mytype, xsize, nrank
-  use decomp_2d_io, only : decomp_2d_read_one!,decomp_2d_read_plane    !for plane statistic
+  use decomp_2d_io, only : decomp_2d_read_one      !for 3-D statistic
+  !use decomp_2d_io, only : decomp_2d_read_plane    !for plane statistic
 
   use mpi
 
@@ -386,22 +387,22 @@ subroutine read_one_user_stat(filename,var)
   character(len=30) :: filename
 
   logical file_exist
-  real(mytype), dimension(xst1:xen1,xst2:xen2,xst3:xen3) :: tmp
-  !real(mytype), dimension(xst1:xst1,xst2:xen2,xst3:xen3) :: tmp    !for plane statistic
+  real(mytype), dimension(xst1:xen1,xst2:xen2,xst3:xen3) :: tmp	!for 3-D statistic
+  !real(mytype), dimension(xst1:xst1,xst2:xen2,xst3:xen3) :: tmp		!for plane statistic
   integer i,j,k
 
   INQUIRE(FILE=filename, EXIST=file_exist)
 
   if (file_exist) then
     !
-    call decomp_2d_read_one(1,tmp,filename,decomp_user_stats)
-    !call decomp_2d_read_plane(1,tmp,filename,decomp_user_stats)    !for plane statistic
+    call decomp_2d_read_one(1,tmp,filename,decomp_user_stats)		!for 3-D statistic
+    !call decomp_2d_read_plane(1,tmp,filename,decomp_user_stats)		!for plane statistic
     !
     do k=xst3,xen3
       do j=xst2,xen2
         do i=xst1,xen1
-          var(i,j,k)=tmp(i,j,k)
-          !var(i,j,k)=tmp(xst1,j,k)    !for plane statistic
+          var(i,j,k)=tmp(i,j,k)		!for 3-D statistic
+          !var(i,j,k)=tmp(xst1,j,k)		!for plane statistic
         end do
       end do
     end do
