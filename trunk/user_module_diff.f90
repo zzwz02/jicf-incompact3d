@@ -1,0 +1,6 @@
+xst1=decomp_user_stats%xst(1)
+xst2=decomp_user_stats%xst(2)
+xst3=decomp_user_stats%xst(3)
+xen1=decomp_user_stats%xen(1)
+xen2=decomp_user_stats%xen(2)
+xen3=decomp_user_stats%xen(3)
