@@ -51,7 +51,7 @@ module variables
 !nvisu = size for visualization collection
 !xjicf is the X-coordinate of the centre of JICF
 !rjicf is the radius of JICF hole
-integer,parameter :: nx=512+1,ny=192+1,nz=256,rezone=228,xjicf=372
+integer,parameter :: nx=256+1,ny=96+1,nz=128,rezone=114,xjicf=186
 integer,parameter :: nstat=1,nvisu=1
 integer,parameter :: p_row=0,p_col=0
 integer,parameter :: nxm=nx-1,nym=ny-1,nzm=nz
@@ -90,11 +90,7 @@ real(mytype), dimension(ny) :: sfypt,ssypt,swypt
 real(mytype), dimension(nz) :: sfzt,sczt,sbzt,sszt,swzt
 real(mytype), dimension(nz) :: sfzpt,sszpt,swzpt
 !!my own scalar subroutine.
-! real(mytype), dimension(ny) :: scalar_a,scalar_b
-! real(mytype), dimension(ny,ny) :: scalar_c,scalar_d
-! real(mytype), dimension(LDAB,ny) :: AB
-real(mytype), dimension(2*ny,2*ny) :: scalar_left
-!real(mytype), dimension(ny) :: fbyt,fcyt,ffyt,fsyt,fwyt
+real(mytype), dimension(2*ny,2*ny) :: scalar_left_main,scalar_left_jet
 
 !module implicit
 real(mytype), dimension(ny) :: aam,bbm,ccm,ddm,eem,ggm,hhm,wwm,zzm !!TIME IMPLICIT, ncl=2

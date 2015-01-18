@@ -465,7 +465,6 @@ else if (itype.eq.5) then
 	  tempb=nz/2-(k+xstart(3)-1)
 	  r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
 	  if (r2 .le. rjicf) then
-	    r2=2.*v_jicf*(1.-r2/rjicf)
 	    phi1(i,1,k)=1.
 	  else
 	    phi1(i,1,k)=0.

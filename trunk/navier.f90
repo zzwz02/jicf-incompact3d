@@ -197,9 +197,9 @@ enddo
 
 if (itype==2) then !channel flow
    call transpose_x_to_y(ux,gx)
-   call transpose_x_to_y(phi,phi22)
+   if (iscalar==1) call transpose_x_to_y(phi,phi22)
    call channel(gx,phi22)
-   call transpose_y_to_x(phi22,phi)
+   if (iscalar==1) call transpose_y_to_x(phi22,phi)
    call transpose_y_to_x(gx,ux)
 endif
 
@@ -297,7 +297,6 @@ elseif (itype==5) then
          if (iscalar==1) then
             do k=1,xsize(3)
             do j=1,xsize(2)
-               !phi(1,j,k)=phi(rezone,j,k)
                phi(1,j,k)=0.
             enddo
             enddo
