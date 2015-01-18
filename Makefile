@@ -23,10 +23,10 @@ FFTW3_LIB = -L/opt/fftw/3.3.4.0/sandybridge/lib -lfftw3_mpi -lfftw3f_mpi
 # Some examples are given below:
 
 # Intel
-#FC = mpif90
-#OPTFC = -O3 -real-size 32 -funroll-loops -cpp -zero # -opt-report=2
-#CC = cc
-#CFLAGS = -O3 -zero
+FC = mpif90
+OPTFC = -O3 -real-size 32 -funroll-loops -cpp -zero # -opt-report=2
+CC = mpicc
+CFLAGS = -O3 -zero
 
 #FC =  
 #OPTFC = 
@@ -52,10 +52,10 @@ FFTW3_LIB = -L/opt/fftw/3.3.4.0/sandybridge/lib -lfftw3_mpi -lfftw3f_mpi
 #CFLAGS = -O3
 
 # Cray
-FC = ftn
-OPTFC = -e Fm -s real32
-CC = cc
-CFLAGS = 
+#FC = ftn
+#OPTFC = -e Fm -s real32
+#CC = cc
+#CFLAGS = 
 
 #-----------------------------------------------------------------------
 # Normally no need to change anything below
@@ -96,7 +96,7 @@ FreeIPC_c.o: FreeIPC_c.c
 	$(CC) $(CFLAGS) -c $<
 
 incompact3d : $(OBJ)
-	$(FC) -O3 -o $@ $(OBJ) $(LIBFFT) 
+	$(FC) -O3 -o $@ $(OBJ) $(LIBFFT) -mkl
 #-L$MKLROOT/lib/intel64/ -Wl,--start-group -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -Wl,--end-group
 
 %.o : %.f90

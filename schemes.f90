@@ -42,14 +42,11 @@ USE derivY
 USE derivZ
 USE variables
 USE var
-USE MPI,only : MPI_WTIME
 
 implicit none
 
 integer  :: i,j,k,ipiv(ny),info
-real(mytype) :: fpi2, fpi2t,t1,t2
-real(mytype), dimension(:), allocatable :: work
-real(mytype), dimension(2*ny,2*ny) :: temp
+real(mytype) :: fpi2, fpi2t
 
 alfa1x= 2.
 af1x  =-(5./2.  )/dx
@@ -1202,171 +1199,31 @@ endif
    endif
 #endif
 
-alpha_0 =1.
-beta_0  =0.
+!!
+!! Robin boundary condition on temperature
+!! alpha * T + beta * dT/dn = g
+!! alpha=1, beta=0 is dirichlet
+!! alpha=0, beta=1 is neumann
+!!
+!! WARNING ATTENTION ACHTUNG WARNING ATTENTION ACHTUNG
+!!
+!! beta is the coefficient for NORMAL derivative :
+!!
+!! alpha_0*T(0) - beta_0*dTdy(0)=g_0
+!! alpha_n*T(L) + beta_n*dTdy(L)=g_n
+!!
+!! WARNING ATTENTION ACHTUNG WARNING ATTENTION ACHTUNG
+!!
+alpha_0 =0.
+beta_0  =1.
 g_0     =0.
-alpha_n =1.
-beta_n  =0.
+alpha_n =0.
+beta_n  =1.
 g_n     =0.
 
 if (iimplicit==0) then
-  t1 = MPI_WTIME()
-  if (nrank==0) print *,'begining constructing scalar_left'
-  scalar_left=0.
-  temp=0.
-  do i=1,2*ny
-     temp(i,i)=1.
-  enddo
-  scalar_left(1,1)=alpha_0
-  scalar_left(1,ny+1)=-beta_0
-  do i=2,ny-1
-    scalar_left(i,i)=1.
-  enddo
-  scalar_left(ny,ny)=alpha_n
-  scalar_left(ny,ny+ny)=beta_n
-  
-  scalar_left(ny+1,1)= -af1y
-  scalar_left(ny+1,2)= -bf1y
-  scalar_left(ny+1,3)= -cf1y
-  scalar_left(ny+2,1)=af2y
-  scalar_left(ny+2,3)= -af2y
-  do j=3,ny-2
-    scalar_left(ny+j,j-2)=bfjy
-    scalar_left(ny+j,j-1)=afjy
-    scalar_left(ny+j,j+1)= -afjy
-    scalar_left(ny+j,j+2)= -bfjy
-  enddo
-  scalar_left(ny+ny-1,ny-2)=afmy
-  scalar_left(ny+ny-1,ny  )= -afmy
-  scalar_left(ny+ny  ,ny-2)=cfny
-  scalar_left(ny+ny  ,ny-1)=bfny
-  scalar_left(ny+ny  ,ny  )=afny
-
-if (istret.ne.0) then
-  scalar_left(ny+1,ny+1)=fcy(1)/ppy(1)
-  scalar_left(ny+1,ny+2)=ffy(1)/ppy(2)
-  do j=2,ny-1
-    scalar_left(ny+j,ny+j-1)=fby(j-1)/ppy(j-1)
-    scalar_left(ny+j,ny+j  )=fcy(j)/ppy(j)
-    scalar_left(ny+j,ny+j+1)=ffy(j)/ppy(j+1)
-  enddo
-  scalar_left(ny+ny,ny+ny-1)=fby(ny-1)/ppy(ny-1)
-  scalar_left(ny+ny,ny+ny)=fcy(ny)/ppy(ny)
-else
-  scalar_left(ny+1,ny+1)=fcy(1)
-  scalar_left(ny+1,ny+2)=ffy(1)
-  do j=2,ny-1
-    scalar_left(ny+j,ny+j-1)=fby(j-1)
-    scalar_left(ny+j,ny+j  )=fcy(j)
-    scalar_left(ny+j,ny+j+1)=ffy(j)
-  enddo
-  scalar_left(ny+ny,ny+ny-1)=fby(ny-1)
-  scalar_left(ny+ny,ny+ny)=fcy(ny)
-endif
-
-
-  t2=MPI_WTIME()-t1
-  if (nrank==0) print *,'completing constructing scalar_left',t2,' seconds'
-!print *,scalar_left
-  t1 = MPI_WTIME()
-!  if (allocated(work)) deallocate(work)
-!  allocate(work(1))
-#ifdef DOUBLE_PREC
-  call dgesv(2*ny,2*ny,scalar_left,2*ny,ipiv,temp,2*ny,info)
-!  call dgetrf(2*ny,2*ny,scalar_left,2*ny,ipiv,info)
-!  call dgetri(2*ny,scalar_left,2*ny,ipiv,work,-1,info)
-#else
-  call sgesv(2*ny,2*ny,scalar_left,2*ny,ipiv,temp,2*ny,info)
-!  call sgetrf(2*ny,2*ny,scalar_left,2*ny,ipiv,info)
-!  call sgetri(2*ny,scalar_left,2*ny,ipiv,work,-1,info)
-#endif
-scalar_left=temp
-!  i=work(1)
-!  info=1
-!  do while (info.ne.0)
-!    j=i
-!    if (allocated(work)) deallocate(work)
-!    allocate(work(j),stat=info)
-!    i=j/2
-!  end do
-!#ifdef DOUBLE_PREC
-!  call dgetri(2*ny,scalar_left,2*ny,ipiv,work,j,info)
-!#else
-!  call sgetri(2*ny,scalar_left,2*ny,ipiv,work,j,info)
-!#endif
-!  if (allocated(work)) deallocate(work)
-  t2=MPI_WTIME()-t1
-  if (nrank==0) print *,'completing inversing scalar_left',t2,' seconds'
-
-!print *,scalar_left
-!   !Diagonal of Matrix A/B/C
-!   scalar_a(1)= alpha_0
-!   scalar_b(1)=-beta_0
-!   do j=2,ny-1
-!     scalar_a(j)=1.
-!     scalar_b(j)=0.
-!   enddo
-!   scalar_a(ny)=alpha_n
-!   scalar_b(ny)=beta_n
-!   
-!   scalar_c=0.
-!   scalar_c(1,1)= af1y
-!   scalar_c(1,2)= bf1y
-!   scalar_c(1,3)= cf1y
-!   scalar_c(2,1)=-af2y
-!   scalar_c(2,3)= af2y
-!   do j=3,ny-2
-!     scalar_c(j,j-2)=-bfjy
-!     scalar_c(j,j-1)=-afjy
-!     scalar_c(j,j+1)= afjy
-!     scalar_c(j,j+2)= bfjy
-!   enddo
-!   scalar_c(ny-1,ny-2)=-afmy
-!   scalar_c(ny-1,ny  )= afmy
-!   scalar_c(ny  ,ny-2)=-cfny
-!   scalar_c(ny  ,ny-1)=-bfny
-!   scalar_c(ny  ,ny  )=-afny
-!   
-!   scalar_d=0.
-!   scalar_d(1,1)=fcy(1)
-!   scalar_d(1,2)=ffy(1)
-!   do j=2,ny-1
-!     scalar_d(j,j-1)=fby(j-1)
-!     scalar_d(j,j  )=fcy(j)
-!     scalar_d(j,j+1)=ffy(j)
-!   enddo
-!   scalar_d(ny,ny-1)=fby(ny-1)
-!   scalar_d(ny,ny)=fcy(ny) 
-!   do j=1,ny
-!   do i=1,ny
-!     scalar_d(i,j)=-scalar_d(i,j)*ppy(j)
-!   enddo
-!   enddo
-!   
-!   !!A=(A^-1)
-!   do j=1,ny
-!     if (scalar_a(j).ne.0) scalar_a(j)=1./scalar_a(j)
-!   enddo
-!   !!C=-C*(A^-1)
-!   do j=1,ny
-!     scalar_c(:,j)=-scalar_c(:,j)*scalar_a(j)
-!   enddo
-!   !!D=D-C*(A^-1)*B
-!   do j=1,ny
-!     scalar_d(:,j)=scalar_d(:,j)+scalar_c(:,j)*scalar_b(j)
-!   enddo
-! 
-!   !Prepare and factoriaze matrix scalar_d
-!   !http://www.netlib.org/lapack/explore-html/da/d87/dgbtrf_8f.html
-!   !AB is the factoriazation of scalar_d
-!   AB=0.
-!   do j=1,ny
-!   do i=max(j-KU,1),min(j+KL,ny)
-!     AB(KL+KU+i-j+1,j)=scalar_d(i,j)
-!   enddo
-!   enddo
-!   call dgbtrf(ny,ny,KL,KU,AB,LDAB,IPIV,INFO)
-
+  call scalar_schemes_exp(alpha_0,beta_0,alpha_n,beta_n,scalar_left_main)
+  call scalar_schemes_exp(1,0,alpha_n,beta_n,scalar_left_jet)
 else
   call implicit_schemes()
   call scalar_schemes(fpi2t)

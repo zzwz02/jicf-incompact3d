@@ -35,7 +35,7 @@ subroutine module_user_init(phG,ph1,ph2,ph3,ph4)
 
 #ifdef my_mod_stats
   if (bool_user_stat) then
-    beg_stat=500000
+    beg_stat=0
     call allocate_user_stats(nx_global, ny_global, nz_global,phG,ph1,ph2,ph3,ph4)
     call read_user_stats(phG,ph1,ph2,ph3,ph4)
   endif
@@ -53,7 +53,6 @@ subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
 #ifdef my_mod_stats
   use user_stats, only : bool_user_stat, beg_stat, &
                          pre_update_user_stats, plot_my_stats
-  use param, only : print_flag
 #endif
 
   implicit none
@@ -65,7 +64,7 @@ subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
     if (itime.gt.beg_stat) then
       call pre_update_user_stats(phG,ph1,ph2,ph3,ph4)
     endif
-      if (print_flag==1) call plot_my_stats()
+      call plot_my_stats()
   endif
 #endif
 

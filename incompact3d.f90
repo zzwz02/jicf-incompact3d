@@ -199,7 +199,7 @@ if (diverge==0) then
          endif
       endif
            
-      if (print_flag==1 .and. itr==iadvance_time) then
+      if (itr==iadvance_time) then
         t=itime*dt
         call test_speed_min_max(ux1,uy1,uz1)
         if (iscalar==1) call test_scalar_min_max(phi1)

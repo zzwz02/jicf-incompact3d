@@ -72,11 +72,11 @@ enddo
 
 call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
 call MPI_REDUCE(phimin,phimin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,code)
-if (nrank==0) print *,'PHI max=',phimax1,'PHI min=',phimin1
+if (print_flag==1 .and. nrank==0) print *,'PHI max=',phimax1,'PHI min=',phimin1
 if (rezone>0) then
   call MPI_REDUCE(phimax_rezone,phimax_rezone1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
   call MPI_REDUCE(phimin_rezone,phimin_rezone1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,code)
-  if (nrank==0) print *,'inside recycling, max=',phimax_rezone1,'min=',phimin_rezone1
+  if (print_flag==1 .and. nrank==0) print *,'inside recycling, max=',phimax_rezone1,'min=',phimin_rezone1
 endif
 
 return
@@ -131,7 +131,7 @@ call MPI_REDUCE(uxmin,uxmin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,code)
 call MPI_REDUCE(uymin,uymin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,code)
 call MPI_REDUCE(uzmin,uzmin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,code)
 
-if (nrank==0) then
+if (print_flag==1 .and. nrank==0) then
    print *,'U,V,W max=',uxmax1,uymax1,uzmax1
    print *,'U,V,W min=',uxmin1,uymin1,uzmin1
 endif
@@ -290,10 +290,10 @@ if (nscheme.ne.4) then
          call decomp_2d_read_var(fh,disp,1,py1)
          call decomp_2d_read_var(fh,disp,1,pz1)
          call decomp_2d_read_var(fh,disp,1,pp3,phG)
-         !call decomp_2d_read_var(fh,disp,1,phi1)
-         !call decomp_2d_read_var(fh,disp,1,phis1)
-         phi1(:,:,:)=0.
-         phis1(:,:,:)=0.
+         call decomp_2d_read_var(fh,disp,1,phi1)
+         call decomp_2d_read_var(fh,disp,1,phis1)
+         !phi1(:,:,:)=0.
+         !phis1(:,:,:)=0.
          call MPI_FILE_CLOSE(fh,ierror)
       endif
    else !SCALAR + AB3
@@ -981,7 +981,7 @@ real(mytype) :: can,ut_in,ut_out,ut_in1,ut_out1,y,ut_in_av
    call MPI_ALLREDUCE(ut_in1,ut_in,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
    call MPI_ALLREDUCE(ut_out1,ut_out,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
    can=(ut_in+ujicf)/ut_out
-   ut_in_av=ut_in/(nz*(yly-yp(ibm_y_max)))
+   ut_in_av=ut_in/(zlz*(yly-yp(ibm_y_max)))
 
    if (print_flag==1 .and. nrank==0) print *,'Averaged Inflow', ut_in_av
    if (print_flag==1 .and. nrank==0) print *,'FLOW RATE I/O: ','in',ut_in,'jet',ujicf,'out',ut_out,'error',(can-1)

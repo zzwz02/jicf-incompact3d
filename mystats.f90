@@ -437,6 +437,8 @@ call dery (ta2,ux2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),1)
 
 u_tau1=0
 sum1=0
+Re_tau1=0
+sum=0
 
 if (itype==5 .and. rezone>0) then
 	do k=1,ysize(3)
@@ -466,13 +468,13 @@ else if (itype==2) then
 	sum=sum/nx/nz/2
 endif
 
-if (print_flag==1 .and. nrank==0) print *,'Re_tau',Re_tau1,'sum',sum
+if (print_flag==1 .and. nrank==0) print *,'Re_tau',Re_tau1,'top-bottom diff',sum
 
 call transpose_y_to_x(ta2,td1)!dudy
 
 Re_tau=(Re_tau*(itime-ifirst)+Re_tau1)/(itime-ifirst+1)
 
-if (print_flag==1 .and. nrank==0) print *,'h+',Re_tau
+if (print_flag==1 .and. nrank==0) print *,'Time-averaged h+',Re_tau
 
 end subroutine
 
