@@ -441,40 +441,42 @@ Re_tau1=0
 sum=0
 
 if (itype==5 .and. rezone>0) then
-	do k=1,ysize(3)
-	do i=1,ysize(1)
+  do k=1,ysize(3)
+  do i=1,ysize(1)
     if(ystart(1)+i-1 .le. rezone) then
-        u_tau1=u_tau1+abs(ta2(i,1,k))+abs(ta2(i,ny,k))
-        sum1=sum1+ta2(i,1,k)+ta2(i,ny,k)
+      u_tau1=u_tau1+abs(ta2(i,1,k))+abs(ta2(i,ny,k))
+      sum1=sum1+ta2(i,1,k)+ta2(i,ny,k)
     endif
-	enddo
-	enddo
+  enddo
+  enddo
 
-	call MPI_ALLREDUCE(u_tau1,Re_tau1,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-	call MPI_ALLREDUCE(sum1,sum,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-	Re_tau1=sqrt(Re_tau1/rezone/nz/2/xnu)
-	sum=sum/rezone/nz/2
+  call MPI_ALLREDUCE(u_tau1,Re_tau1,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+  call MPI_ALLREDUCE(sum1,sum,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+  Re_tau1=sqrt(Re_tau1/rezone/nz/2/xnu)
+  sum=sum/rezone/nz/2
+  if (print_flag==1 .and. nrank==0) print *,'Re_tau',Re_tau1,'top-bottom diff',sum
+  
+  Re_tau=(Re_tau*(itime-ifirst)+Re_tau1)/(itime-ifirst+1)
+  if (print_flag==1 .and. nrank==0) print *,'Time-averaged h+',Re_tau
 else if (itype==2) then
-	do k=1,ysize(3)
-	do i=1,ysize(1)
-	u_tau1=u_tau1+abs(ta2(i,1,k))+abs(ta2(i,ny,k))
-	sum1=sum1+ta2(i,1,k)+ta2(i,ny,k)
-	enddo
-	enddo
+  do k=1,ysize(3)
+  do i=1,ysize(1)
+    u_tau1=u_tau1+abs(ta2(i,1,k))+abs(ta2(i,ny,k))
+    sum1=sum1+ta2(i,1,k)+ta2(i,ny,k)
+  enddo
+  enddo
 
-	call MPI_ALLREDUCE(u_tau1,Re_tau1,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-	call MPI_ALLREDUCE(sum1,sum,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-	Re_tau1=sqrt(Re_tau1/nx/nz/2/xnu)
-	sum=sum/nx/nz/2
+  call MPI_ALLREDUCE(u_tau1,Re_tau1,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+  call MPI_ALLREDUCE(sum1,sum,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+  Re_tau1=sqrt(Re_tau1/rezone/nz/2/xnu)
+  sum=sum/rezone/nz/2
+  if (print_flag==1 .and. nrank==0) print *,'Re_tau',Re_tau1,'top-bottom diff',sum
+  
+  Re_tau=(Re_tau*(itime-ifirst)+Re_tau1)/(itime-ifirst+1)
+  if (print_flag==1 .and. nrank==0) print *,'Time-averaged h+',Re_tau
 endif
 
-if (print_flag==1 .and. nrank==0) print *,'Re_tau',Re_tau1,'top-bottom diff',sum
-
 call transpose_y_to_x(ta2,td1)!dudy
-
-Re_tau=(Re_tau*(itime-ifirst)+Re_tau1)/(itime-ifirst+1)
-
-if (print_flag==1 .and. nrank==0) print *,'Time-averaged h+',Re_tau
 
 end subroutine
 

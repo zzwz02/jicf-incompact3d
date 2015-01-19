@@ -232,12 +232,12 @@ else
   !ibm_y_max=min((itime-0)/5000+91,97)
 endif
 
-if (itype.ne.5) then
-   call ecoule(ux,uy,uz)
-   call random_number(bxo)
-   call random_number(byo)
-   call random_number(bzo)
+call ecoule(ux,uy,uz)
+call random_number(bxo)
+call random_number(byo)
+call random_number(bzo)
 
+if (itype.ne.5) then
    if (iin.eq.1) then  
       do k=1,xsize(3)
       do j=1,xsize(2)
@@ -275,22 +275,13 @@ elseif (itype==5) then
          endif !(iscalar==1)
       endif !(iin.eq.1)
    else  !rezone==0, no recycling
-      call ecoule(ux,uy,uz)
-      call random_number(bxo)
-      call random_number(byo)
-      call random_number(bzo)
+
       if (iin.eq.1) then  
          do k=1,xsize(3)
          do j=1,xsize(2)
-            if ((j+xstart(2)-1)<ibm_y_max) then
-	       bxx1(j,k)=0.
-      	       bxy1(j,k)=0.
-      	       bxz1(j,k)=0.
-            else
-	       bxx1(j,k)=bxx1(j,k)+bxo(j,k)*noise1
-      	       bxy1(j,k)=bxy1(j,k)+byo(j,k)*noise1
-      	       bxz1(j,k)=bxz1(j,k)+bzo(j,k)*noise1
-            endif
+	    bxx1(j,k)=bxx1(j,k)+bxo(j,k)*noise1
+      	    bxy1(j,k)=bxy1(j,k)+byo(j,k)*noise1
+      	    bxz1(j,k)=bxz1(j,k)+bzo(j,k)*noise1
             !if (print_flag==1 .and. (k+xstart(3)-1)==1) print *,'bxx1',(j+xstart(2)-1),k,bxx1(j,k)
          enddo
          enddo
@@ -453,14 +444,15 @@ if (itype.eq.5) then
       print *,'X NOT POSSIBLE'
       stop
    endif
-   if (nclz.ne.0) then
-      print *,'Z NOT POSSIBLE'
-      stop
-   endif
    if (ncly==0) then
       print *,'Y NOT POSSIBLE'
       stop
    endif
+   if (nclz.ne.0) then
+      print *,'Z NOT POSSIBLE'
+      stop
+   endif
+
    do k=1,xsize(3)
    do j=1,xsize(2)
      if (j+xstart(2)-1<ibm_y_max) then
