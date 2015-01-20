@@ -1222,8 +1222,17 @@ beta_n  =1.
 g_n     =0.
 
 if (iimplicit==0) then
-  call scalar_schemes_exp(alpha_0,beta_0,alpha_n,beta_n,scalar_left_main)
-  call scalar_schemes_exp(1,0,alpha_n,beta_n,scalar_left_jet)
+  if (itype.ne.5) then
+    call scalar_schemes_exp(alpha_0,beta_0,alpha_n,beta_n,scalar_left_main)
+  else if (itype.eq.5) then
+    if (wall_bc==1) then
+      call scalar_schemes_exp(1,0,1,0,scalar_left_main)
+      call scalar_schemes_exp(1,0,1,0,scalar_left_jet)
+    else if (wall_bc==2) then
+      call scalar_schemes_exp(0,1,0,1,scalar_left_main)
+      call scalar_schemes_exp(1,0,0,1,scalar_left_jet)
+    endif
+  endif
 else
   call implicit_schemes()
   call scalar_schemes(fpi2t)
