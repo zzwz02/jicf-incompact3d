@@ -51,12 +51,13 @@ module variables
 !nvisu = size for visualization collection
 !xjicf is the X-coordinate of the centre of JICF
 !rjicf is the radius of JICF hole
+!wall_bc: 1. iso-heat on the wall; 2. iso-flux on the wall
 integer,parameter :: nx=256+1,ny=96+1,nz=128,rezone=114,xjicf=186
+integer,parameter :: wall_bc=1
 integer,parameter :: nstat=1,nvisu=1
 integer,parameter :: p_row=0,p_col=0
 integer,parameter :: nxm=nx-1,nym=ny-1,nzm=nz
 real,parameter :: rjicf=1.0,v_jicf=1./6.  !0.
-! integer,parameter :: KL=2,KU=2,LDAB=2*KL+KU+1
 !end module variables
 
 !module filter
