@@ -47,7 +47,7 @@ module decomp_2d
   ! define neighboring blocks (to be used in halo-cell support)
   !  first dimension 1=X-pencil, 2=Y-pencil, 3=Z-pencil
   ! second dimension 1=east, 2=west, 3=north, 4=south, 5=top, 6=bottom 
-  integer, save, dimension(3,6) :: neighbour 
+  integer, save, public, dimension(3,6) :: neighbour 
 
   ! flags for periodic condition in three dimensions
   logical, save :: periodic_x, periodic_y, periodic_z

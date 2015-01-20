@@ -543,7 +543,6 @@ integer (kind=MPI_OFFSET_KIND) :: disp
 
 if (iin.eq.1) then !generation of a random noise
 
-
    call system_clock(count=code)
    call random_seed(size = ii)
    call random_seed(put = code+63949*nrank*(/ (i - 1, i = 1, ii) /)) ! 63949, "large" prime number
@@ -551,8 +550,6 @@ if (iin.eq.1) then !generation of a random noise
    call random_number(ux1)
    call random_number(uy1)
    call random_number(uz1)
-
-
 
    do k=1,xsize(3)
    do j=1,xsize(2)

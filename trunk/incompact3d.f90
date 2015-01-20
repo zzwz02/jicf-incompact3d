@@ -46,7 +46,7 @@ use user_specific
 
 implicit none
 
-integer :: code,nlock,i,j,k,ii,bcx,bcy,bcz,fh,ierror,iend
+integer :: code,nlock,i,j,k,ii,bcx,bcy,bcz,fh,ierror
 real(mytype) :: x,y,z,tmp1
 double precision :: t1,t2
 character(len=20) :: filename
@@ -124,10 +124,7 @@ call decomp_info_init(nxm, ny, nz, ph2)
 call decomp_info_init(nxm, nym, nz, ph3) 
 
 if (ivirt==0) ibm_y_max=1
-itime=ifirst
-do while (itime<=ilast)
-iend=itime
-if (diverge==1) itime=ilast
+do itime=ifirst,ilast
    t=(itime-1)*dt
    if (mod(itime,print_interval)==0) then 
     print_flag=1
@@ -227,7 +224,6 @@ if (diverge==1) itime=ilast
       call VISU_PRE (pp3,ta1,tb1,di1,ta2,tb2,di2,&
            ta3,di3,nxmsize,nymsize,nzmsize,phG,ph2,ph3,uvisu)
    endif
-itime=itime+1
 enddo
 
 !if (mod(itime,isave).ne.0) then
@@ -240,12 +236,11 @@ t2=MPI_WTIME()-t1
 call MPI_ALLREDUCE(t2,t1,1,MPI_REAL8,MPI_SUM, &
                    MPI_COMM_WORLD,code)
 if (nrank==0) print *,'time per time_step: ', &
-     t1/float(nproc)/(iend-ifirst+1),' seconds'
+     t1/float(nproc)/(ilast-ifirst+1),' seconds'
 if (nrank==0) print *,'simulation with nx*ny*nz=',nx,ny,nz,'mesh nodes'
 if (nrank==0) print *,'Mapping p_row*p_col=',p_row,p_col
-if (diverge==1 .and. nrank==0) print *,'Diverged!!!'
 
-call decomp_2d_poisson_finalize
+!call decomp_2d_poisson_finalize
 call decomp_2d_finalize
 CALL MPI_FINALIZE(code)
 

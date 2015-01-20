@@ -1,3 +1,5 @@
+#define my_mod_solide
+
 !************************************************************
 !
 subroutine scalar_exp(ux1,uy1,uz1,phi1,phis1,phiss1,di1,ta1,tb1,tc1,td1,&

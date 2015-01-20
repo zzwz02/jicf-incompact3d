@@ -136,7 +136,12 @@ if (print_flag==1 .and. nrank==0) then
    print *,'U,V,W min=',uxmin1,uymin1,uzmin1
 endif
 
-if (uxmax1==-1609) diverge=1
+if (uxmax1==-1609) then
+   if (nrank==0) print *,'Diverged!!!'
+   call decomp_2d_finalize
+   CALL MPI_FINALIZE(code)
+   call exit(0)
+endif
 
 return
 end subroutine test_speed_min_max
@@ -901,10 +906,9 @@ do i=1,ysize(1)
    ut3=ut3+ut
 enddo
 enddo
-ut3=ut3/ysize(1)/ysize(3)
 
 call MPI_ALLREDUCE(ut3,ut4,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-ut4=ut4/nproc
+ut4=ut4/(nx*nz)
 
 !can=-2.*xnu*gdt(itr) ! Poisseuille    
 can=-(1.-ut4) ! constant flow rate
