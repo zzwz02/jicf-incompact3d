@@ -106,11 +106,6 @@ incompact3d : $(OBJ)
 clean:
 	rm -f *.o *.mod incompact3d
 
-.PHONY: move 
-move:
-	mv incompact3d ..
-	rm -f *.o *.mod incompact3d
-
 .PHONY: realclean
 realclean: clean
 	rm -f *~ \#*\#
