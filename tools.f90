@@ -95,7 +95,6 @@ USE param
 USE var
 USE MPI
 
-
 implicit none
 
 integer :: i,j,k
@@ -137,10 +136,8 @@ if (print_flag==1 .and. nrank==0) then
 endif
 
 if (uxmax1==-1609) then
-   if (nrank==0) print *,'Diverged!!!'
-   call decomp_2d_finalize
-   CALL MPI_FINALIZE(code)
-   call exit(0)
+  print *,' Diverged!!!'
+  call exit(-1)
 endif
 
 return
@@ -442,6 +439,7 @@ if (ivirt==2) then
 endif
 endif
 
+return
 end subroutine restart
 !
 !*******************************************************************
@@ -588,6 +586,7 @@ do j=1,ny
    pp4yi(j)=(-2./beta*cos(pi*yetai(j))*sin(pi*yetai(j)))
 enddo
 
+return
 end subroutine stretching
 
 !*****************************************************************
@@ -730,7 +729,6 @@ enddo
 enddo
 
 return
-
 end subroutine inversion5_v1 
 
 !*****************************************************************
@@ -871,7 +869,6 @@ enddo
 enddo
 
 return
-
 end subroutine inversion5_v2
 
 !********************************************************************

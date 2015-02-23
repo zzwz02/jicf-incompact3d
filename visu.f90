@@ -29,7 +29,7 @@
 !    problems with up to 0(10^5) computational cores, Int. J. of Numerical 
 !    Methods in Fluids, vol 67 (11), pp 1735-1757
 !################################################################################
-
+!#define my_mod_solide
 !############################################################################
 !
 subroutine VISU_INSTA (ux1,uy1,uz1,phi1,ta1,tb1,tc1,td1,te1,tf1,tg1,th1,ti1,di1,&
@@ -42,6 +42,10 @@ USE param
 USE variables
 USE decomp_2d
 USE decomp_2d_io
+use user_stats, only : beg_stat
+#ifdef my_mod_solide
+use conjugate_ht, only : temp_bot,temp_top
+#endif
 
 implicit none
 
@@ -102,7 +106,7 @@ enddo
 uvisu=0.
 call fine_to_coarseV(1,di1,uvisu)
 990 format('vort',I3.3)
-write(filename, 990) itime/imodulo
+write(filename, 990) (itime-beg_stat)/imodulo
 call decomp_2d_write_one(1,uvisu,filename,2)
 !call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !     1,di1,filename)
@@ -113,21 +117,21 @@ call decomp_2d_write_one(1,uvisu,filename,2)
 uvisu=0.
 call fine_to_coarseV(1,ux1,uvisu)
 993 format('ux',I3.3)
-      write(filename, 993) itime/imodulo
+      write(filename, 993) (itime-beg_stat)/imodulo
 call decomp_2d_write_one(1,uvisu,filename,2)
 !call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !           1,ux1,filename)
 uvisu=0.
 call fine_to_coarseV(1,uy1,uvisu)
 994 format('uy',I3.3)
-      write(filename, 994) itime/imodulo
+      write(filename, 994) (itime-beg_stat)/imodulo
 call decomp_2d_write_one(1,uvisu,filename,2)
 !call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !           1,uy1,filename)
 uvisu=0.
 call fine_to_coarseV(1,uz1,uvisu)
 995 format('uz',I3.3)
-      write(filename, 995) itime/imodulo
+      write(filename, 995) (itime-beg_stat)/imodulo
 call decomp_2d_write_one(1,uvisu,filename,2)
 !call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !           1,uz1,filename)
@@ -139,10 +143,24 @@ if (iscalar==1) then
 uvisu=0.
 call fine_to_coarseV(1,phi1,uvisu)
 996 format('phi',I3.3)
-   write(filename, 996) itime/imodulo
+   write(filename, 996) (itime-beg_stat)/imodulo
    call decomp_2d_write_one(1,uvisu,filename,2)
 !   call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !        1,phi1,filename)
+#ifdef my_mod_solide
+uvisu=0.
+call fine_to_coarseV(2,temp_bot,uvisu)
+997 format('temp_bot',I3.3)
+   write(filename, 997) itime/imodulo
+   call decomp_2d_write_one(2,uvisu,filename,2)
+uvisu=0.
+call fine_to_coarseV(2,temp_top,uvisu)
+998 format('temp_bot',I3.3)
+   write(filename, 998) itime/imodulo
+   call decomp_2d_write_one(2,uvisu,filename,2)
+!   call decomp_2d_write_one(nx_global,ny_global,nz_global,&
+!        1,phi1,filename)
+#endif
 endif
 !############################################################################
 
@@ -263,6 +281,7 @@ USE param
 USE variables
 USE decomp_2d
 USE decomp_2d_io
+use user_stats, only : beg_stat
 
 implicit none
 
@@ -301,7 +320,7 @@ call interi6(tb1,ta1,di1,sx,cifip6,cisip6,ciwip6,cifx6,cisx6,ciwx6,&
 uvisu=0.
 call fine_to_coarseV(1,tb1,uvisu)
 990 format('pp',I3.3)
-      write(filename, 990) itime/imodulo
+      write(filename, 990) (itime-beg_stat)/imodulo
 call decomp_2d_write_one(1,uvisu,filename,2)
 !call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !           1,tb1,filename)

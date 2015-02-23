@@ -43,6 +43,7 @@ USE IBM
 USE derivX
 USE derivZ
 use user_specific
+use user_stats, only : beg_stat
 
 implicit none
 
@@ -136,7 +137,7 @@ do itime=ifirst,ilast
       write(*,1001) itime,t
 1001  format('Time step =',i7,', Time unit =',F9.3)
    endif
-   
+ 
    do itr=1,iadvance_time
 
       if (nclx.eq.2) then
@@ -197,7 +198,7 @@ do itime=ifirst,ilast
                  uy2,uz2,phi2,di2,ta2,tb2,tc2,td2,uz3,phi3,di3,ta3,tb3)
          endif
       endif
-           
+
       if (itr==iadvance_time) then
         t=itime*dt
         call test_speed_min_max(ux1,uy1,uz1)
@@ -217,13 +218,14 @@ do itime=ifirst,ilast
       call module_user_post(phG,ph1,ph2,ph3,ph4)
    endif
      
-   if (mod(itime,imodulo)==0) then
+   if (itime>beg_stat .and. mod(itime,imodulo)==0 .and. (itime-beg_stat)*dt<=xlx) then
       call VISU_INSTA(ux1,uy1,uz1,phi1,ta1,tb1,tc1,td1,te1,tf1,tg1,th1,ti1,di1,&
            ta2,tb2,tc2,td2,te2,tf2,tg2,th2,ti2,tj2,di2,&
            ta3,tb3,tc3,td3,te3,tf3,tg3,th3,ti3,di3,phG,uvisu)
       call VISU_PRE (pp3,ta1,tb1,di1,ta2,tb2,di2,&
            ta3,di3,nxmsize,nymsize,nzmsize,phG,ph2,ph3,uvisu)
    endif
+
 enddo
 
 !if (mod(itime,isave).ne.0) then
@@ -236,7 +238,7 @@ t2=MPI_WTIME()-t1
 call MPI_ALLREDUCE(t2,t1,1,MPI_REAL8,MPI_SUM, &
                    MPI_COMM_WORLD,code)
 if (nrank==0) print *,'time per time_step: ', &
-     t1/float(nproc)/(ilast-ifirst+1),' seconds'
+     t1/float(nproc)/(itime-ifirst+1),' seconds'
 if (nrank==0) print *,'simulation with nx*ny*nz=',nx,ny,nz,'mesh nodes'
 if (nrank==0) print *,'Mapping p_row*p_col=',p_row,p_col
 

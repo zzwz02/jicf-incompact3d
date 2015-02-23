@@ -45,7 +45,7 @@ USE var
 
 implicit none
 
-integer  :: i,j,k,ipiv(ny),info
+integer  :: i,j,k
 real(mytype) :: fpi2, fpi2t
 
 alfa1x= 2.
@@ -1214,6 +1214,8 @@ endif
 !!
 !! WARNING ATTENTION ACHTUNG WARNING ATTENTION ACHTUNG
 !!
+
+if (iscalar==1) then
 alpha_0 =0.
 beta_0  =1.
 g_0     =0.
@@ -1222,20 +1224,14 @@ beta_n  =1.
 g_n     =0.
 
 if (iimplicit==0) then
-  if (itype.ne.5) then
-    call scalar_schemes_exp(alpha_0,beta_0,alpha_n,beta_n,scalar_left_main)
-  else if (itype.eq.5) then
-    if (wall_bc==1) then
-      call scalar_schemes_exp(1,0,1,0,scalar_left_main)
-      call scalar_schemes_exp(1,0,1,0,scalar_left_jet)
-    else if (wall_bc==2) then
-      call scalar_schemes_exp(0,1,0,1,scalar_left_main)
-      call scalar_schemes_exp(1,0,0,1,scalar_left_jet)
-    endif
-  endif
+  if (nrank==0) print *,' begining constructing scalar_left_main  Matrix'
+  call scalar_schemes_exp(alpha_0,beta_0,alpha_n,beta_n,scalar_left_main)
+  if (nrank==0) print *,' begining constructing scalar_left_jet  Matrix'
+  call scalar_schemes_exp(1,0,alpha_n,beta_n,scalar_left_jet)
 else
   call implicit_schemes()
   call scalar_schemes(fpi2t)
+endif
 endif
 
 return
