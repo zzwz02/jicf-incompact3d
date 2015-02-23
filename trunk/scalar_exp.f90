@@ -1,4 +1,4 @@
-#define my_mod_solide
+!#define my_mod_solide
 
 !************************************************************
 !
@@ -19,8 +19,9 @@ real(mytype),dimension(ysize(1),ysize(2),ysize(3)) :: ux2,uy2,uz2,phi2,di2,ta2,t
 real(mytype),dimension(zsize(1),zsize(2),zsize(3)) :: uz3,phi3,di3,ta3,tb3
 real(mytype),dimension(ysize(1),2*ysize(2),ysize(3)) :: tt2
 
-integer :: ijk,nvect1,nvect2,nvect3,i,j,k,l,nxyz,tempa,tempb,IPIV(ny),INFO
+integer :: ijk,nvect1,nvect2,nvect3,i,j,k,l,nxyz,tempa,tempb
 real(mytype) :: x,y,z,r2
+logical,dimension(ysize(1),ysize(3)) :: injet
 
 nvect1=xsize(1)*xsize(2)*xsize(3)
 nvect2=ysize(1)*ysize(2)*ysize(3)
@@ -29,16 +30,11 @@ nvect3=zsize(1)*zsize(2)*zsize(3)
 !call transpose_x_to_y(ux1,temp1)
 !call transpose_x_to_y(uy1,temp2)
 !call transpose_x_to_y(uz1,temp3)
-!do k=1,ysize(3)
-!do i=1,ysize(1)
-!    if (print_flag==1 .and. k+ystart(3)-1==1 .and. i+ystart(1)-1==1) then
-!        print *,'ux',temp1(i,:,k)
-!        print *,'uy',temp2(i,:,k)
-!        print *,'uz',temp3(i,:,k)
-!        go to 100
-!    endif
-!enddo
-!enddo
+!if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
+!  print *,'ux',temp1(1,:,1)
+!  print *,'uy',temp2(1,:,1)
+!  print *,'uz',temp3(1,:,1)
+!endif
 
 !X PENCILS
 100 do ijk=1,nvect1
@@ -49,17 +45,12 @@ call derxx (ta1,phi1,di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1)
 
 !call transpose_x_to_y(tb1,temp1)
 !call transpose_x_to_y(ta1,temp2)
-!do k=1,ysize(3)
-!do i=1,ysize(1)
-!    if (print_flag==1 .and. k+ystart(3)-1==1 .and. i+ystart(1)-1==1) then
-!        print *,'dTUdx',temp1(i,:,k)
-!        print *,'dTdxx',temp2(i,:,k)
-!        go to 200
-!    endif
-!enddo
-!enddo
+!if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
+!  print *,'dTUdx',temp1(1,:,1)
+!  print *,'dTdxx',temp2(1,:,1)
+!endif
 
-200 call transpose_x_to_y(phi1,phi2)
+call transpose_x_to_y(phi1,phi2)
 call transpose_x_to_y(uy1,uy2)
 call transpose_x_to_y(uz1,uz2)
 
@@ -84,18 +75,12 @@ else
   call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1) 
 endif
 
+!if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
+!  print *,'dTUdy',tb2(1,:,1)
+!  print *,'dTdyy',ta2(1,:,1)
+!endif
 
-!do k=1,ysize(3)
-!do i=1,ysize(1)
-!    if (print_flag==1 .and. k+ystart(3)-1==1 .and. i+ystart(1)-1==1) then
-!        print *,'dTUdy',tb2(i,:,k)
-!        print *,'dTdyy',ta2(i,:,k)
-!        go to 300
-!    endif
-!enddo
-!enddo
-
-300 call transpose_y_to_z(phi2,phi3)
+call transpose_y_to_z(phi2,phi3)
 call transpose_y_to_z(uz2,uz3)
 
 !Z PENCILS
@@ -108,18 +93,13 @@ call derzz (ta3,phi3,di3,sz,sfzp,sszp,swzp,zsize(1),zsize(2),zsize(3),1)
 call transpose_z_to_y(ta3,tc2)
 call transpose_z_to_y(tb3,td2)
 
-!do k=1,ysize(3)
-!do i=1,ysize(1)
-!    if (print_flag==1 .and. k+ystart(3)-1==1 .and. i+ystart(1)-1==1) then
-!        print *,'dTUdz',td2(i,:,k)
-!        print *,'dTdzz',tc2(i,:,k)
-!        go to 400
-!    endif
-!enddo
-!enddo
+!if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
+!   print *,'dTUdz',td2(1,:,1)
+!   print *,'dTdzz',tc2(1,:,1)
+!endif
 
 !Y PENCILS ADD TERMS
-400 do ijk=1,nvect2
+do ijk=1,nvect2
    tc2(ijk,1,1)=tc2(ijk,1,1)+ta2(ijk,1,1)
    td2(ijk,1,1)=td2(ijk,1,1)+tb2(ijk,1,1)
 enddo
@@ -133,26 +113,21 @@ do ijk=1,nvect1
    tb1(ijk,1,1)=tb1(ijk,1,1)+td1(ijk,1,1) !FIRST DERIVATIVE
 enddo
 
-!call transpose_x_to_y(tb1,temp1)
-!call transpose_x_to_y(ta1,temp2)
-!do k=1,ysize(3)
-!do i=1,ysize(1)
-!    if (print_flag==1 .and. k+ystart(3)-1==1 .and. i+ystart(1)-1==1) then
-!        print *,'FIRST DERIVATIVE',temp1(i,:,k)
-!        print *,'SECOND DERIVATIVE',temp2(i,:,k)
-!        go to 500
-!    endif
-!enddo
-!enddo
+! call transpose_x_to_y(tb1,temp1)
+! call transpose_x_to_y(ta1,temp2)
+! if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
+!   print *,'FIRST DERIVATIVE',temp1(1,:,1)
+!   print *,'SECOND DERIVATIVE',temp2(1,:,1)
+! endif
 
-500 do ijk=1,nvect1
-   ta1(ijk,1,1)=xnu/sc*ta1(ijk,1,1)-tb1(ijk,1,1)!-xnu/sc*ux1(ijk,1,1)
+do ijk=1,nvect1
+   ta1(ijk,1,1)=xnu/sc*ta1(ijk,1,1)-tb1(ijk,1,1)-xnu/sc*ux1(ijk,1,1)
 enddo
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!
 !!! Kasagi Source term !!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!
-!ta1=ta1+ux1*xnu/sc
+!ta1=ta1-xnu/sc*ux1
 
 do ijk=1,nvect1
    ta1(ijk,1,1)=(1.-epsi(ijk,1,1))*ta1(ijk,1,1)
@@ -217,6 +192,7 @@ endif
 
 call transpose_x_to_y(phi1,phi2)
 tt2=0.
+injet=.false.
 
 if (ncly==2) then
 if (itype.eq.2) then
@@ -237,6 +213,7 @@ else if (itype.eq.5) then
       r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
       if (r2 .le. rjicf) then
         phi2(i,1,k)=1.
+        injet(i,k)=.true.
       else
         phi2(i,1,k)=0. !g_0
       endif
@@ -252,22 +229,10 @@ do k=1,ysize(3)
 do l=1,ny
 do j=1,ny+ny
 do i=1,ysize(1)
-  if (itype.eq.2) then
+  if (injet(i,k)) then
+    tt2(i,j,k)=tt2(i,j,k)+scalar_left_jet(j,l)*phi2(i,l,k)
+  else
     tt2(i,j,k)=tt2(i,j,k)+scalar_left_main(j,l)*phi2(i,l,k)
-  else if (itype.eq.5) then
-    if (v_jicf==0.) then
-      tt2(i,j,k)=tt2(i,j,k)+scalar_left_main(j,l)*phi2(i,l,k)
-    else
-      !check the hole
-      tempa=xjicf-(i+ystart(1)-1)
-      tempb=nz/2-(k+ystart(3)-1)
-      r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
-      if (r2 .le. rjicf) then
-        tt2(i,j,k)=tt2(i,j,k)+scalar_left_jet(j,l)*phi2(i,l,k)
-      else
-        tt2(i,j,k)=tt2(i,j,k)+scalar_left_main(j,l)*phi2(i,l,k)
-      endif
-    endif
   endif
 enddo
 enddo
@@ -281,20 +246,17 @@ do i=1,ysize(1)
 enddo
 enddo
 enddo
+endif
+! if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
+!   !print *,'dTdy',tt2(1,ny+1:ny*2:4,1)
+!   print *,'T',phi2(1,1:ny:8,1)
+! endif
 
-! do k=1,ysize(3)
-! do i=1,ysize(1)
-!     if (print_flag==1 .and. k+ystart(3)-1==1 .and. i+ystart(1)-1==1) then
-!         print *,'dTdy',tt2(i,ny+1:ny*2:4,k)
-!         print *,'T',phi2(i,1:ny:4,k)
-!         go to 600
-!     endif
-! enddo
-! enddo
 
-600 call transpose_y_to_x(phi2,phi1)
+call transpose_y_to_x(phi2,phi1)
 
- end subroutine scalar_exp
+return
+end subroutine scalar_exp
  
  
 !********************************************************************
@@ -310,7 +272,7 @@ USE decomp_2d, only : nrank
 
 implicit none
 
-integer :: i,j,ipiv(ny),info
+integer :: i,j,ipiv(2*ny),info
 
 real(mytype) :: t1,t2
 real(mytype), intent(in) :: alpha_00,beta_00,alpha_nn,beta_nn
@@ -318,7 +280,6 @@ real(mytype), dimension(2*ny,2*ny) :: temp
 real(mytype), dimension(2*ny,2*ny), intent(out) :: scalar_left
 
   t1 = MPI_WTIME()
-  if (nrank==0) print *,'begining constructing scalar_left'
   scalar_left=0.
   temp=0.
   do i=1,2*ny
@@ -372,7 +333,7 @@ real(mytype), dimension(2*ny,2*ny), intent(out) :: scalar_left
   endif
 
   t2=MPI_WTIME()-t1
-  if (nrank==0) print *,'completing constructing scalar_left',t2,' seconds'
+  if (nrank==0) print *,'   - Matrix constructed ',t2,' seconds'
 !print *,scalar_left
   t1 = MPI_WTIME()
 
@@ -384,6 +345,7 @@ real(mytype), dimension(2*ny,2*ny), intent(out) :: scalar_left
 
   scalar_left=temp
   t2=MPI_WTIME()-t1
-  if (nrank==0) print *,'completing inversing scalar_left',t2,' seconds'
+  if (nrank==0) print *,'   - Matrix inversed ',t2,' seconds'
 
+  return
 end subroutine scalar_schemes_exp

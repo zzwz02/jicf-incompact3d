@@ -1,9 +1,9 @@
 #define my_mod_stats
-#define my_mod_solide
+!#define my_mod_solide
 
-#ifdef my_mod_solide
-#include "myconjht.f90"
-#endif
+! #ifdef my_mod_solide
+! #include "myconjht.f90"
+! #endif
 
 #ifdef my_mod_stats
 #include "mystats.f90"
@@ -28,7 +28,7 @@ subroutine module_user_init(phG,ph1,ph2,ph3,ph4)
 #endif
 #ifdef my_mod_solide
   use conjugate_ht
-  use param, only : xnu, sc
+  use param, only : xnu, sc, iscalar
 #endif
 
   implicit none
@@ -38,13 +38,14 @@ subroutine module_user_init(phG,ph1,ph2,ph3,ph4)
   integer :: j
 !  real(mytype) :: xx, yy, zz
 
+bool_conjugate_ht=.false.
 #ifdef my_mod_stats
   bool_user_stat=.true.
 #endif
 #ifdef my_mod_solide
-  bool_conjugate_ht=.true.
+  if (iscalar.eq.1) bool_conjugate_ht=.true.
   if (bool_conjugate_ht) then
-    ny_sol_bot=128
+    ny_sol_bot=64
     ly_sol_bot=1.
     repr_sol_bot=sc/xnu
     fluxratio_bot=1.
@@ -58,7 +59,7 @@ subroutine module_user_init(phG,ph1,ph2,ph3,ph4)
 
 #ifdef my_mod_stats
   if (bool_user_stat) then
-    beg_stat=0
+    beg_stat=10000000
     call allocate_user_stats(nx_global, ny_global, nz_global,phG,ph1,ph2,ph3,ph4)
     call read_user_stats(phG,ph1,ph2,ph3,ph4)
   endif
@@ -79,6 +80,7 @@ subroutine module_user_init(phG,ph1,ph2,ph3,ph4)
   endif
 #endif
 
+return
 end subroutine module_user_init
 
 subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
@@ -112,11 +114,12 @@ subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
 #endif
 
 #ifdef my_mod_solide
-  if (bool_conjugate_ht.and.bool_sol_stats) then
+  if (bool_sol_stats) then
     if (itime.gt.beg_stat_sol) call update_solide_stats()
   endif
 #endif
 
+return
 end subroutine module_user_write
 
 subroutine module_user_post(phG,ph1,ph2,ph3,ph4)
@@ -150,6 +153,7 @@ subroutine module_user_post(phG,ph1,ph2,ph3,ph4)
   endif
 #endif
 
+return
 end subroutine module_user_post
 
 end module user_specific

@@ -3,12 +3,13 @@ module conjugate_ht
 ! Module for conjugate heat transfer
 !
 use decomp_2d, only : mytype, DECOMP_INFO
+use param, only : print_flag
 
 type(decomp_info), save :: mydecomp_bot, mydecomp_top
 logical, save :: bool_conjugate_ht, bool_sol_stats
 integer, save :: beg_stat_sol
 integer, save :: ny_sol_bot, ny_sol_top
-real(mytype), parameter :: sol_imp_var=0. ! 1=explicit, 0=implicit, 0.5=Crank-Nicolson
+real(mytype), parameter :: sol_imp_var=0. ! 1=explicit, 0=implicit, 0.5=Crank-Nicolson. 0 recommended
 real(mytype), save :: ly_sol_bot, ly_sol_top
 real(mytype), save :: repr_sol_bot, repr_sol_top
 real(mytype), save :: fluxratio_bot, fluxratio_top
@@ -25,8 +26,22 @@ real(mytype), save, allocatable, dimension(:,:,:) :: bot_dm3, top_dm3
 !
 ! stats
 !
-real(mytype), save, allocatable, dimension(:,:,:) :: tempm_1_bot, tempm_2_bot
-real(mytype), save, allocatable, dimension(:,:,:) :: tempm_1_top, tempm_2_top
+real(mytype), save, allocatable, dimension(:,:,:) :: tempm_1_bot, tempm_2_bot, tdeltat_bot
+real(mytype), save, allocatable, dimension(:,:,:) :: tempm_1_top, tempm_2_top, tdeltat_top
+!
+! second derivative in x & z
+!
+real(mytype), save :: fpi2ts
+real(mytype), save :: alsaixts, asixts, bsixts, csixts
+real(mytype), save :: alsakzts, askzts, bskzts, cskzts
+real(mytype), save, allocatable, dimension(:) :: sfxts, scxts, sbxts, ssxts, swxts
+real(mytype), save, allocatable, dimension(:) :: sfxpts, ssxpts, swxpts
+real(mytype), save, allocatable, dimension(:) :: sfzts, sczts, sbzts, sszts, swzts
+real(mytype), save, allocatable, dimension(:) :: sfzpts, sszpts, swzpts
+!
+! first derivative in y
+!
+real(mytype), save, allocatable, dimension(:,:) :: mat_dery
 
 contains
 
@@ -36,12 +51,13 @@ subroutine conjugate_ht_init()
 !
   use decomp_2d, only : ysize, nrank, ystart
   use param, only : yly, ilit, twopi, dz, dx, dt
+  use MPI,only : MPI_WTIME
 
   implicit none
 
   ! Local variables
   integer :: i,j,k
-  real(mytype) :: ytmp
+  real(mytype) :: ytmp,t1,t2
   real(mytype) :: x, z, mysx, mysy, mysz
   real(mytype), dimension(ysize(1),ny_sol_bot+1+2,ysize(3)) :: ydiff_bot
   real(mytype), dimension(ysize(1),ny_sol_top+1+2,ysize(3)) :: ydiff_top
@@ -54,7 +70,7 @@ subroutine conjugate_ht_init()
   ! +2 points pour les bords
   !
   allocate(yp_bot(ny_sol_bot+1+2), yp_top(ny_sol_top+1+2))
-  call cheb_nodes(yp_bot,ny_sol_bot,-ly_sol_bot,0.)
+  call cheb_nodes(yp_bot,ny_sol_bot,-ly_sol_bot,0._mytype)
   call cheb_nodes(yp_top,ny_sol_top,yly,yly+ly_sol_top)
   if (nrank.eq.0) print *,'    - Chebyshev nodes computed'
   if (nrank.eq.0) then
@@ -87,10 +103,12 @@ subroutine conjugate_ht_init()
   ! Compute coefficients of second derivative
   ! on Chebyshev nodes (y-direction)
   !
+  t1 = MPI_WTIME()
   allocate(d2pn_bot(ny_sol_bot+1,ny_sol_bot+1), d2pn_top(ny_sol_top+1,ny_sol_top+1))
   call cheb_der2(d2pn_bot,yp_bot,ny_sol_bot)
   call cheb_der2(d2pn_top,yp_top,ny_sol_top)
-  if (nrank.eq.0) print *,'    - Y-diffusion matrix computed'
+  t2=MPI_WTIME()-t1
+  if (nrank.eq.0) print *,'    - Y-diffusion matrix computed',t2,' seconds'
   if (nrank.eq.0) print *,'    - Computing inverse of matrix'
   allocate(invdiffy_bot(ny_sol_bot-1,ny_sol_bot-1))
   i = my_ydiff_mat_inv(d2pn_bot,ny_sol_bot,invdiffy_bot,flux_bot(1,:),flux_bot(2,:),repr_sol_bot)
@@ -127,50 +145,54 @@ subroutine conjugate_ht_init()
   !
   ! Initial value for temperature
   !
-  if (ilit.eq.0) then
+  if (ilit.eq.0 .or. .true.) then
     !
-    do k=1,ysize(3)
-      z=(k-1+ystart(3)-1)*dz
-      mysz=sin(twopi*z)
-    do j=1,ny_sol_bot+1+2
-      ytmp=yp_bot(j)
-      mysy=sin(twopi*ytmp)
-    do i=1,ysize(1)
-      x=(i-1+ystart(1)-1)*dx
-      mysx=sin(twopi*x)
-      temp_bot(i,j,k)=ytmp*fluxratio_bot
-    enddo
-    enddo
-    enddo
-    !
-    do k=1,ysize(3)
-      z=(k-1+ystart(3)-1)*dz
-      mysz=sin(twopi*z)
-    do j=1,ny_sol_top+1+2
-      ytmp=yp_top(j)
-      mysy=sin(twopi*ytmp)
-    do i=1,ysize(1)
-      x=(i-1+ystart(1)-1)*dx
-      mysx=sin(twopi*x)
-      temp_top(i,j,k)=-(ytmp-2.)*fluxratio_top
-    enddo
-    enddo
-    enddo
-    !
-    ! Compute current xz diffusion
-    call xzdiff_temp_solide(temp_bot,bot_dm1,ny_sol_bot)
-    call xzdiff_temp_solide(temp_top,top_dm1,ny_sol_top)
-    ! Compute current y diffusion
-    call ydiff_temp_solide(ydiff_bot,temp_bot,d2pn_bot,ny_sol_bot)
-    call ydiff_temp_solide(ydiff_top,temp_top,d2pn_top,ny_sol_top)
-    ! Diffusion non explicite
-    bot_dm1=(bot_dm1+sol_imp_var*ydiff_bot)/repr_sol_bot
-    top_dm1=(top_dm1+sol_imp_var*ydiff_top)/repr_sol_top
+!    do k=1,ysize(3)
+!      z=(k-1+ystart(3)-1)*dz
+!      mysz=sin(twopi*z)
+!    do j=1,ny_sol_bot+1+2
+!      ytmp=yp_bot(j)
+!      mysy=sin(twopi*ytmp)
+!    do i=1,ysize(1)
+!      x=(i-1+ystart(1)-1)*dx
+!      mysx=sin(twopi*x)
+!      temp_bot(i,j,k)=ytmp*fluxratio_bot
+!    enddo
+!    enddo
+!    enddo
+!    !
+!    do k=1,ysize(3)
+!      z=(k-1+ystart(3)-1)*dz
+!      mysz=sin(twopi*z)
+!    do j=1,ny_sol_top+1+2
+!      ytmp=yp_top(j)
+!      mysy=sin(twopi*ytmp)
+!    do i=1,ysize(1)
+!      x=(i-1+ystart(1)-1)*dx
+!      mysx=sin(twopi*x)
+!      temp_top(i,j,k)=-(ytmp-2.)*fluxratio_top
+!    enddo
+!    enddo
+!    enddo
+!    !
+!    ! Compute current xz diffusion
+!    call xzdiff_temp_solide(temp_bot,bot_dm1,ny_sol_bot,mydecomp_bot)
+!    call xzdiff_temp_solide(temp_top,top_dm1,ny_sol_top,mydecomp_top)
+!    ! Compute current y diffusion
+!    call ydiff_temp_solide(ydiff_bot,temp_bot,d2pn_bot,ny_sol_bot)
+!    call ydiff_temp_solide(ydiff_top,temp_top,d2pn_top,ny_sol_top)
+!    ! Diffusion non explicite
+!    bot_dm1=(bot_dm1+sol_imp_var*ydiff_bot)/repr_sol_bot
+!    top_dm1=(top_dm1+sol_imp_var*ydiff_top)/repr_sol_top
+temp_bot=0.
+temp_top=0.
+bot_dm1=0.
+top_dm1=0.
     if (nrank.eq.0) print *,'    - Solid temperature initialized'
     ! Compute min/max & check convergence
-    if (nrank.eq.0) print *,'Solide bas : '
+    if (nrank.eq.0) print *,'Solid bottom : '
     call test_sol_min_max(temp_bot,yp_bot,ny_sol_bot,fluxratio_bot,repr_sol_bot)
-    if (nrank.eq.0) print *,'Solide haut : '
+    if (nrank.eq.0) print *,'Solid top : '
     call test_sol_min_max(temp_top,yp_top,ny_sol_top,fluxratio_top,repr_sol_top)
     !
   else
@@ -376,18 +398,20 @@ subroutine update_temp_solide()
   real(mytype), dimension(ysize(1),ny_sol_top+1+2,ysize(3)) :: ydiff_top
 
   ! Switch from Euler1 to AB3
-  if ((ilit.eq.0).and.(itime.eq.1)) then
+!  if ((ilit.eq.0).and.(itime.eq.1)) then
+  if (itime==1) then
     a=   dt
     b=   0.
     c=   0.
-  elseif ((ilit.eq.0).and.(itime.eq.2)) then
-    a=   1.5*dt
-    b= - 0.5*dt
+!  elseif ((ilit.eq.0).and.(itime.eq.2)) then
+  elseif (itime==2) then
+    a=   2.*dt
+    b= - dt
     c=   0.
   else
-    a=   (23./12.)*dt
-    b= - (16./12.)*dt
-    c=   ( 5./12.)*dt
+    a=   3.*dt
+    b= - 3.*dt
+    c=   dt
   endif
 
   ! Full RHS in temporary array ydiff_***
@@ -402,10 +426,10 @@ subroutine update_temp_solide()
 
   ! Boundary coundition : flux imposed with fluid and temperature imposed with exterior
   ! Derivate in solid is derivate in fluid * fluxratio
-  ydiff_bot(:,1,:)=1.!-fluxratio_bot
+  ydiff_bot(:,1,:)=-1. !-fluxratio_bot
   ydiff_bot(:,ny_sol_bot+1+2,:)=cl_bot(:,1,:)*fluxratio_bot
   ydiff_top(:,1,:)=cl_top(:,1,:)*fluxratio_top
-  ydiff_top(:,ny_sol_top+1+2,:)=-1.!-fluxratio_top
+  ydiff_top(:,ny_sol_top+1+2,:)=1. !fluxratio_top
 
   ! Use matrix inversion to update temperature
   ! New temperature in temp_bot and temp_top
@@ -415,9 +439,9 @@ subroutine update_temp_solide()
            d2pn_top,val_top,ny_sol_top,flux_top(1,:),flux_top(2,:),repr_sol_top)
 
   ! Compute min/max & check convergence if required
-  if (nrank.eq.0) print *,'Solide bas : '
+  if (print_flag==1 .and. nrank.eq.0) print *,'Solid bottom : '
   call test_sol_min_max(temp_bot,yp_bot,ny_sol_bot,fluxratio_bot,repr_sol_bot)
-  if (nrank.eq.0) print *,'Solide haut : '
+  if (print_flag==1 .and. nrank.eq.0) print *,'Solid top : '
   call test_sol_min_max(temp_top,yp_top,ny_sol_top,fluxratio_top,repr_sol_top)
 
   ! Update history
@@ -428,8 +452,8 @@ subroutine update_temp_solide()
 
   ! Compute current xz diffusion
   ! (bot_dm1 and top_dm1 are updated)
-  call xzdiff_temp_solide(temp_bot,bot_dm1,ny_sol_bot)
-  call xzdiff_temp_solide(temp_top,top_dm1,ny_sol_top)
+  call xzdiff_temp_solide(temp_bot,bot_dm1,ny_sol_bot,mydecomp_bot)
+  call xzdiff_temp_solide(temp_top,top_dm1,ny_sol_top,mydecomp_top)
   ! Compute current y diffusion
   ! (stored in temporary array ydiff_***)
   call ydiff_temp_solide(ydiff_bot,temp_bot,d2pn_bot,ny_sol_bot)
@@ -674,405 +698,154 @@ subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr)
 
 end subroutine my_new_solid_temp
 
-subroutine xzdiff_temp_solide(temp,dm1,n)
+subroutine xzdiff_temp_solide(temp,dm1,n,mydeco)
 !
 ! Compute diffusion of temp
 ! In x and z direction
 ! and put it in dm1
 !
-  use decomp_2d, only : ysize, nproc, neighbour, nrank, ystart, yend, real_type
-  use param, only : dx2, dz2, itime, ifirst
-  use MPI
+  use decomp_2d, only : ysize, nproc, neighbour, nrank, ystart, yend, real_type, &
+                        alloc_x, alloc_y, alloc_z, &
+                        transpose_x_to_y, transpose_y_to_x, &
+                        transpose_z_to_y, transpose_y_to_z
+  use param, only : dx2, dz2, itime, ifirst, pi
+  use variables, only : nx, nz
 
   implicit none
 
   integer, intent(in) :: n
+  type(decomp_info), intent(in) :: mydeco
   real(mytype), dimension(ysize(1),n+1+2,ysize(3)), intent(in) :: temp
   real(mytype), dimension(ysize(1),n+1+2,ysize(3)), intent(out) :: dm1
 
   ! Local variables
-  integer status(MPI_STATUS_SIZE)
   integer :: i,j,k
-  integer :: req_0s, req_0r, req_1s, req_1r
-  integer, save :: x0, x1, z0, z1
-  real(mytype) :: a, b, c
-  real(mytype) :: ax, bx, cx
-  real(mytype) :: az, bz, cz
-  real(mytype), dimension(3,n+1+2,ysize(3)) :: tmpxx, tmpxx2
-  real(mytype), dimension(-2:0,n+1+2,ysize(3)) :: xmoins
-  real(mytype), dimension(ysize(1)+1:ysize(1)+3,n+1+2,ysize(3)) :: xplus
-  real(mytype), dimension(ysize(1),n+1+2,3) :: tmpzz, tmpzz2
-  real(mytype), dimension(ysize(1),n+1+2,-2:0) :: zmoins
-  real(mytype), dimension(ysize(1),n+1+2,ysize(3)+1:ysize(3)+3) :: zplus
-
-  ! Finite difference scheme for x & z diffusion
-  a=6./4.
-  b=-3./5.
-  c=2./20.
-  ax=a/dx2
-  bx=b/(4.*dx2)
-  cx=c/(9.*dx2)
-  az=a/dz2
-  bz=b/(4.*dz2)
-  cz=c/(9.*dz2)
+  real(mytype), dimension(mydeco%xsz(1),mydeco%xsz(2),mydeco%xsz(3)) :: dtdxx
+  real(mytype), dimension(mydeco%zsz(1),mydeco%zsz(2),mydeco%zsz(3)) :: dtdzz
+  real(mytype), dimension(mydeco%ysz(1),mydeco%ysz(2),mydeco%ysz(3)) :: dtdxyz
+  real(mytype), dimension(mydeco%xsz(1),mydeco%xsz(2),mydeco%xsz(3)) :: temp1
+  real(mytype), dimension(mydeco%zsz(1),mydeco%zsz(2),mydeco%zsz(3)) :: temp3
+  real(mytype), dimension(mydeco%xsz(1),mydeco%xsz(2),mydeco%xsz(3)) :: di1
+  real(mytype), dimension(mydeco%zsz(1),mydeco%zsz(2),mydeco%zsz(3)) :: di3
+  real(mytype), dimension(mydeco%xsz(2),mydeco%xsz(3)) :: sx
+  real(mytype), dimension(mydeco%zsz(1),mydeco%zsz(2)) :: sz
+!  real(mytype), allocatable, dimension(:,:,:) :: dtdxx, dtdzz, dtdxyz
+!  real(mytype), allocatable, dimension(:,:,:) :: temp1, temp3
+!  real(mytype), allocatable, dimension(:,:,:) :: di1,di3
+!  real(mytype), allocatable, dimension(:,:) :: sx,sz
 
   ! Init diffusion (dm1) and boundary values
   dm1=0.
-  xmoins=0.
-  xplus=0.
-  zmoins=0.
-  zplus=0.
 
-  if (itime.eq.ifirst) then ! Prepare communication for periodic boundary condition
+  if (.not.allocated(sfxts)) then ! init x & z second derivative
 
-    if (neighbour(2,1).ne.neighbour(2,2)) then ! x-direction
+    ! allocate
+    allocate(sfxts(nx), scxts(nx), sbxts(nx), ssxts(nx), swxts(nx))
+    allocate(sfxpts(nx), ssxpts(nx), swxpts(nx))
+    allocate(sfzts(nz), sczts(nz), sbzts(nz), sszts(nz), swzts(nz))
+    allocate(sfzpts(nz), sszpts(nz), swzpts(nz))
+    ! init
+    sfxts=0.; scxts=0.; sbxts=0.; ssxts=0.; swxts=0.
+    sfxpts=0.; ssxpts=0.; swxpts=0.
+    sfzts=0.; sczts=0.; sbzts=0.; sszts=0.; swzts=0.
+    sfzpts=0.; sszpts=0.; swzpts=0.
 
-      ! X, gauche vers droite
-      if (neighbour(2,2).eq.MPI_PROC_NULL) then ! first
-        !send
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      neighbour(2,1), nrank, MPI_COMM_WORLD, i)
-        call MPI_RECV(x0, 1, mpi_integer, &
-                      MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, status, i)
-      elseif (neighbour(2,1).ne.MPI_PROC_NULL) then ! middle
-        call MPI_RECV(x0, 1, mpi_integer, &
-                      neighbour(2,2), neighbour(2,2), MPI_COMM_WORLD, status, i)
-        call MPI_SEND(x0, 1, mpi_integer, &
-                      neighbour(2,1), nrank, MPI_COMM_WORLD, i)
-        x0=MPI_PROC_NULL
-      else ! last
-        call MPI_RECV(x0, 1, mpi_integer, &
-                      neighbour(2,2), neighbour(2,2), MPI_COMM_WORLD, status, i)
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      x0, 0, MPI_COMM_WORLD, i)
-      endif
-      call MPI_BARRIER(mpi_comm_world,i)
-      ! X, droite vers gauche
-      if (neighbour(2,1).eq.MPI_PROC_NULL) then ! last
-        !send
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      neighbour(2,2), nrank, MPI_COMM_WORLD, i)
-        !recv
-        call MPI_RECV(x1, 1, mpi_integer, &
-                      MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, status, i)
-      elseif (neighbour(2,2).ne.MPI_PROC_NULL) then ! middle
-        !recv
-        call MPI_RECV(x1, 1, mpi_integer, &
-                      neighbour(2,1), neighbour(2,1), MPI_COMM_WORLD, status, i)
-        !send
-        call MPI_SEND(x1, 1, mpi_integer, &
-                      neighbour(2,2), nrank, MPI_COMM_WORLD, i)
-        x1=MPI_PROC_NULL
-      else ! first
-        !recv
-        call MPI_RECV(x1, 1, mpi_integer, &
-                      neighbour(2,1), neighbour(2,1), MPI_COMM_WORLD, status, i)
-        !send to last
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      x1, 1, MPI_COMM_WORLD, i)
-      endif
-      call MPI_BARRIER(mpi_comm_world,i)
-    endif
+    ! wavenumber at cut-off
+    fpi2ts=4.
+    ! compact finite difference coefficients in x
+    alsaixts=(45.*fpi2ts*pi*pi-272.)/(2.*(45.*fpi2ts*pi*pi-208.))
+    asixts  =((6.-9.*alsaixts)/4.)/dx2
+    bsixts  =((-3.+24.*alsaixts)/5.)/(4.*dx2)
+    csixts  =((2.-11.*alsaixts)/20.)/(9.*dx2)
+    ! compact finite difference coefficients in z
+    alsakzts=(45.*fpi2ts*pi*pi-272.)/(2.*(45.*fpi2ts*pi*pi-208.))
+    askzts  =((6.-9.*alsakzts)/4.)/dz2
+    bskzts  =((-3.+24.*alsakzts)/5.)/(4.*dz2)
+    cskzts  =((2.-11.*alsakzts)/20.)/(9.*dz2)
 
-    if (neighbour(2,5).ne.neighbour(2,6)) then ! z-direction
-
-      ! Z, bas vers haut
-      if (neighbour(2,6).eq.MPI_PROC_NULL) then ! first
-        !send
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      neighbour(2,5), nrank, MPI_COMM_WORLD, i)
-        !recv
-        call MPI_RECV(z0, 1, mpi_integer, &
-                      MPI_ANY_SOURCE, 2, MPI_COMM_WORLD, status, i)
-      elseif (neighbour(2,5).ne.MPI_PROC_NULL) then ! middle
-        !recv
-        call MPI_RECV(z0, 1, mpi_integer, &
-                      neighbour(2,6), neighbour(2,6), MPI_COMM_WORLD, status, i)
-        !send
-        call MPI_SEND(z0, 1, mpi_integer, &
-                      neighbour(2,5), nrank, MPI_COMM_WORLD, i)
-        z0=MPI_PROC_NULL
-      else ! last
-        !recv
-        call MPI_RECV(z0, 1, mpi_integer, &
-                      neighbour(2,6), neighbour(2,6), MPI_COMM_WORLD, status, i)
-        !send to first
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      z0, 2, MPI_COMM_WORLD, i)
-      endif
-      call MPI_BARRIER(mpi_comm_world,i)
-      ! Z, haut vers bas
-      if (neighbour(2,5).eq.MPI_PROC_NULL) then ! last
-        !send
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      neighbour(2,6), nrank, MPI_COMM_WORLD, i)
-        !recv
-        call MPI_RECV(z1, 1, mpi_integer, &
-                      MPI_ANY_SOURCE, 3, MPI_COMM_WORLD, status, i)
-      elseif (neighbour(2,6).ne.MPI_PROC_NULL) then ! middle
-        !recv
-        call MPI_RECV(z1, 1, mpi_integer, &
-                      neighbour(2,5), neighbour(2,5), MPI_COMM_WORLD, status, i)
-        !send
-        call MPI_SEND(z1, 1, mpi_integer, &
-                      neighbour(2,6), nrank, MPI_COMM_WORLD, i)
-        z1=MPI_PROC_NULL
-      else ! first
-        !recv
-        call MPI_RECV(z1, 1, mpi_integer, &
-                      neighbour(2,5), neighbour(2,5), MPI_COMM_WORLD, status, i)
-        !send to last
-        call MPI_SEND(nrank, 1, mpi_integer, &
-                      z1, 3, MPI_COMM_WORLD, i)
-      endif
-      call MPI_BARRIER(mpi_comm_world,i)
-    endif
-
-  endif
-
-  if (neighbour(2,1).eq.neighbour(2,2)) then ! No neighbour in x-direction
-    xmoins(-2,:,:)=temp(ysize(1)-2,:,:)
-    xmoins(-1,:,:)=temp(ysize(1)-1,:,:)
-    xmoins( 0,:,:)=temp(ysize(1)  ,:,:)
-    xplus(ysize(1)+1,:,:)=temp(1,:,:)
-    xplus(ysize(1)+2,:,:)=temp(2,:,:)
-    xplus(ysize(1)+3,:,:)=temp(3,:,:)
-  else
-
-    ! Init
-    tmpxx(:,:,:)=temp(ysize(1)-2:ysize(1),:,:)
-
-    ! X, gauche vers droite
-    if (neighbour(2,2).eq.MPI_PROC_NULL) then ! first
-      !recv
-      call MPI_IRECV(tmpxx2, 3*(n+1+2)*ysize(3), real_type, &
-                    x0, x0, MPI_COMM_WORLD, req_0r, i)
-      !send
-      call MPI_ISEND(tmpxx, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,1), nrank, MPI_COMM_WORLD, req_0s, i)
-    elseif (neighbour(2,1).ne.MPI_PROC_NULL) then ! middle
-      !recv
-      call MPI_IRECV(tmpxx2, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,2), neighbour(2,2), MPI_COMM_WORLD, req_0r, i)
-      !send
-      call MPI_ISEND(tmpxx, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,1), nrank, MPI_COMM_WORLD, req_0s, i)
-    else ! last
-      !recv
-      call MPI_IRECV(tmpxx2, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,2), neighbour(2,2), MPI_COMM_WORLD, req_0r, i)
-      !send to first
-      call MPI_ISEND(tmpxx, 3*(n+1+2)*ysize(3), real_type, &
-                    x0, nrank, MPI_COMM_WORLD, req_0s, i)
-    endif
-    call MPI_Wait(req_0s,status,i)
-    call MPI_Wait(req_0r,status,i)
-
-    xmoins=tmpxx2
-    tmpxx(:,:,:)=temp(1:3,:,:)
-
-    ! X, droite vers gauche
-    if (neighbour(2,1).eq.MPI_PROC_NULL) then ! last
-      !recv
-      call MPI_IRECV(tmpxx2, 3*(n+1+2)*ysize(3), real_type, &
-                    x1, x1, MPI_COMM_WORLD, req_1r, i)
-      !send
-      call MPI_ISEND(tmpxx, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,2), nrank, MPI_COMM_WORLD, req_1s, i)
-    elseif (neighbour(2,2).ne.MPI_PROC_NULL) then ! middle
-      !recv
-      call MPI_IRECV(tmpxx2, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,1), neighbour(2,1), MPI_COMM_WORLD, req_1r, i)
-      !send
-      call MPI_ISEND(tmpxx, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,2), nrank, MPI_COMM_WORLD, req_1s, i)
-    else ! first
-      !recv
-      call MPI_IRECV(tmpxx2, 3*(n+1+2)*ysize(3), real_type, &
-                    neighbour(2,1), neighbour(2,1), MPI_COMM_WORLD, req_1r, i)
-      !send to last
-      call MPI_ISEND(tmpxx, 3*(n+1+2)*ysize(3), real_type, &
-                    x1, nrank, MPI_COMM_WORLD, req_1s, i)
-    endif
-
-    call MPI_Wait(req_1s,status,i)
-    call MPI_Wait(req_1r,status,i)
-    xplus=tmpxx2
-
-  endif
-
-  if (neighbour(2,5).eq.neighbour(2,6)) then ! No neighbour in z-direction
-    zmoins(:,:,-2)=temp(:,:,ysize(3)-2)
-    zmoins(:,:,-1)=temp(:,:,ysize(3)-1)
-    zmoins(:,:, 0)=temp(:,:,ysize(3)  )
-    zplus(:,:,ysize(3)+1)=temp(:,:,1)
-    zplus(:,:,ysize(3)+2)=temp(:,:,2)
-    zplus(:,:,ysize(3)+3)=temp(:,:,3)
-  else
-
-    ! Init
-    tmpzz(:,:,:)=temp(:,:,ysize(3)-2:ysize(3))
-
-    ! Z, bas vers haut
-    if (neighbour(2,6).eq.MPI_PROC_NULL) then ! first
-      !recv
-      call MPI_IRECV(tmpzz2, ysize(1)*(n+1+2)*3, real_type, &
-                    z0, z0, MPI_COMM_WORLD, req_0r, i)
-      !send
-      call MPI_ISEND(tmpzz, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,5), nrank, MPI_COMM_WORLD, req_0s, i)
-    elseif (neighbour(2,5).ne.MPI_PROC_NULL) then ! middle
-      !recv
-      call MPI_IRECV(tmpzz2, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,6), neighbour(2,6), MPI_COMM_WORLD, req_0r, i)
-      !send
-      call MPI_ISEND(tmpzz, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,5), nrank, MPI_COMM_WORLD, req_0s, i)
-    else ! last
-      !recv
-      call MPI_IRECV(tmpzz2, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,6), neighbour(2,6), MPI_COMM_WORLD, req_0r, i)
-      !send to first
-      call MPI_ISEND(tmpzz, ysize(1)*(n+1+2)*3, real_type, &
-                    z0, nrank, MPI_COMM_WORLD, req_0s, i)
-    endif
-
-    call MPI_Wait(req_0r,status,i)
-    call MPI_Wait(req_0s,status,i)
-
-    zmoins=tmpzz2
-    tmpzz(:,:,:)=temp(:,:,1:3)
-
-    ! Z, haut vers bas
-    if (neighbour(2,5).eq.MPI_PROC_NULL) then ! last
-      !recv
-      call MPI_IRECV(tmpzz2, ysize(1)*(n+1+2)*3, real_type, &
-                    z1, z1, MPI_COMM_WORLD, req_1r, i)
-      !send
-      call MPI_ISEND(tmpzz, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,6), nrank, MPI_COMM_WORLD, req_1s, i)
-    elseif (neighbour(2,6).ne.MPI_PROC_NULL) then ! middle
-      !recv
-      call MPI_IRECV(tmpzz2, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,5), neighbour(2,5), MPI_COMM_WORLD, req_1r, i)
-      !send
-      call MPI_ISEND(tmpzz, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,6), nrank, MPI_COMM_WORLD, req_1s, i)
-    else ! first
-      !recv
-      call MPI_IRECV(tmpzz2, ysize(1)*(n+1+2)*3, real_type, &
-                    neighbour(2,5), neighbour(2,5), MPI_COMM_WORLD, req_1r, i)
-      !send to last
-      call MPI_ISEND(tmpzz, ysize(1)*(n+1+2)*3, real_type, &
-                    z1, nrank, MPI_COMM_WORLD, req_1s, i)
-    endif
-
-    call MPI_Wait(req_1r,status,i)
-    call MPI_Wait(req_1s,status,i)
-    zplus=tmpzz2
-
-  endif
-
-  ! xdiff
-  do k=1,ysize(3)
-  do j=1,n+1+2
-    i=1
-    dm1(i,j,k) = ax*(xmoins(i-1,j,k)+temp(i+1,j,k)-2.*temp(i,j,k)) &
-               + bx*(xmoins(i-2,j,k)+temp(i+2,j,k)-2.*temp(i,j,k)) &
-               + cx*(xmoins(i-3,j,k)+temp(i+3,j,k)-2.*temp(i,j,k))
-    i=2
-    dm1(i,j,k) = ax*(temp(i-1  ,j,k)+temp(i+1,j,k)-2.*temp(i,j,k)) &
-               + bx*(xmoins(i-2,j,k)+temp(i+2,j,k)-2.*temp(i,j,k)) &
-               + cx*(xmoins(i-3,j,k)+temp(i+3,j,k)-2.*temp(i,j,k))
-    i=3
-    dm1(i,j,k) = ax*(temp(i-1  ,j,k)+temp(i+1,j,k)-2.*temp(i,j,k)) &
-               + bx*(temp(i-2  ,j,k)+temp(i+2,j,k)-2.*temp(i,j,k)) &
-               + cx*(xmoins(i-3,j,k)+temp(i+3,j,k)-2.*temp(i,j,k))
-    do i=4,ysize(1)-3
-      dm1(i,j,k) = ax*(temp(i-1,j,k)+temp(i+1,j,k)-2.*temp(i,j,k)) &
-                 + bx*(temp(i-2,j,k)+temp(i+2,j,k)-2.*temp(i,j,k)) &
-                 + cx*(temp(i-3,j,k)+temp(i+3,j,k)-2.*temp(i,j,k))
+    ! nclx=0 only implemented
+    sfxts(1)   =alsaixts
+    sfxts(2)   =alsaixts
+    sfxts(nx-2)=alsaixts
+    sfxts(nx-1)=alsaixts
+    sfxts(nx)  =0.
+    scxts(1)   =2.
+    scxts(2)   =1.
+    scxts(nx-2)=1.
+    scxts(nx-1)=1.
+    scxts(nx  )=1.+alsaixts*alsaixts
+    sbxts(1)   =alsaixts
+    sbxts(2)   =alsaixts
+    sbxts(nx-2)=alsaixts
+    sbxts(nx-1)=alsaixts
+    sbxts(nx  )=0.
+    do i=3,nx-3
+       sfxts(i)=alsaixts
+       scxts(i)=1.
+       sbxts(i)=alsaixts
     enddo
-    i=ysize(1)-2
-    dm1(i,j,k) = ax*(temp(i-1,j,k)+temp(i+1 ,j,k)-2.*temp(i,j,k)) &
-               + bx*(temp(i-2,j,k)+temp(i+2 ,j,k)-2.*temp(i,j,k)) &
-               + cx*(temp(i-3,j,k)+xplus(i+3,j,k)-2.*temp(i,j,k))
-    i=ysize(1)-1
-    dm1(i,j,k) = ax*(temp(i-1,j,k)+temp(i+1 ,j,k)-2.*temp(i,j,k)) &
-               + bx*(temp(i-2,j,k)+xplus(i+2,j,k)-2.*temp(i,j,k)) &
-               + cx*(temp(i-3,j,k)+xplus(i+3,j,k)-2.*temp(i,j,k))
-    i=ysize(1)
-    dm1(i,j,k) = ax*(temp(i-1,j,k)+xplus(i+1,j,k)-2.*temp(i,j,k)) &
-               + bx*(temp(i-2,j,k)+xplus(i+2,j,k)-2.*temp(i,j,k)) &
-               + cx*(temp(i-3,j,k)+xplus(i+3,j,k)-2.*temp(i,j,k))
-  enddo
-  enddo
 
-  ! + zdiff
-  k=1
-  do j=1,n+1+2
-  do i=1,ysize(1)
-    dm1(i,j,k) = dm1(i,j,k) &
-               + az*(zmoins(i,j,k-1)+temp(i,j,k+1)-2.*temp(i,j,k)) &
-               + bz*(zmoins(i,j,k-2)+temp(i,j,k+2)-2.*temp(i,j,k)) &
-               + cz*(zmoins(i,j,k-3)+temp(i,j,k+3)-2.*temp(i,j,k))
-  enddo
-  enddo
-  k=2
-  do j=1,n+1+2
-  do i=1,ysize(1)
-    dm1(i,j,k) = dm1(i,j,k) &
-               + az*(temp(i,j,k-1  )+temp(i,j,k+1)-2.*temp(i,j,k)) &
-               + bz*(zmoins(i,j,k-2)+temp(i,j,k+2)-2.*temp(i,j,k)) &
-               + cz*(zmoins(i,j,k-3)+temp(i,j,k+3)-2.*temp(i,j,k))
-  enddo
-  enddo
-  k=3
-  do j=1,n+1+2
-  do i=1,ysize(1)
-    dm1(i,j,k) = dm1(i,j,k) &
-               + az*(temp(i,j,k-1  )+temp(i,j,k+1)-2.*temp(i,j,k)) &
-               + bz*(temp(i,j,k-2  )+temp(i,j,k+2)-2.*temp(i,j,k)) &
-               + cz*(zmoins(i,j,k-3)+temp(i,j,k+3)-2.*temp(i,j,k))
-  enddo
-  enddo
-  do k=4,ysize(3)-3
-  do j=1,n+1+2
-  do i=1,ysize(1)
-    dm1(i,j,k) = dm1(i,j,k) &
-               + az*(temp(i,j,k-1)+temp(i,j,k+1)-2.*temp(i,j,k)) &
-               + bz*(temp(i,j,k-2)+temp(i,j,k+2)-2.*temp(i,j,k)) &
-               + cz*(temp(i,j,k-3)+temp(i,j,k+3)-2.*temp(i,j,k))
-  enddo
-  enddo
-  enddo
-  k=ysize(3)-2
-  do j=1,n+1+2
-  do i=1,ysize(1)
-    dm1(i,j,k) = dm1(i,j,k) &
-               + az*(temp(i,j,k-1)+temp(i,j,k+1 )-2.*temp(i,j,k)) &
-               + bz*(temp(i,j,k-2)+temp(i,j,k+2 )-2.*temp(i,j,k)) &
-               + cz*(temp(i,j,k-3)+zplus(i,j,k+3)-2.*temp(i,j,k))
-  enddo
-  enddo
-  k=ysize(3)-1
-  do j=1,n+1+2
-  do i=1,ysize(1)
-    dm1(i,j,k) = dm1(i,j,k) &
-               + az*(temp(i,j,k-1)+temp(i,j,k+1 )-2.*temp(i,j,k)) &
-               + bz*(temp(i,j,k-2)+zplus(i,j,k+2)-2.*temp(i,j,k)) &
-               + cz*(temp(i,j,k-3)+zplus(i,j,k+3)-2.*temp(i,j,k))
-  enddo
-  enddo
-  k=ysize(3)
-  do j=1,n+1+2
-  do i=1,ysize(1)
-    dm1(i,j,k) = dm1(i,j,k) &
-               + az*(temp(i,j,k-1)+zplus(i,j,k+1)-2.*temp(i,j,k)) &
-               + bz*(temp(i,j,k-2)+zplus(i,j,k+2)-2.*temp(i,j,k)) &
-               + cz*(temp(i,j,k-3)+zplus(i,j,k+3)-2.*temp(i,j,k))
-  enddo
-  enddo
+    ! nclz=0 only implemented
+    sfzts(1)   =alsakzts
+    sfzts(2)   =alsakzts
+    sfzts(nz-2)=alsakzts
+    sfzts(nz-1)=alsakzts
+    sfzts(nz)  =0.
+    sczts(1)   =2.
+    sczts(2)   =1.
+    sczts(nz-2)=1.
+    sczts(nz-1)=1.
+    sczts(nz  )=1.+alsakzts*alsakzts
+    sbzts(1)   =alsakzts
+    sbzts(2)   =alsakzts
+    sbzts(nz-2)=alsakzts
+    sbzts(nz-1)=alsakzts
+    sbzts(nz  )=0.
+    do k=3,nz-3
+       sfzts(k)=alsakzts
+       sczts(k)=1.
+       sbzts(k)=alsakzts
+    enddo
+
+    call prepare (sbxts,scxts,sfxts,ssxts,swxts,nx)
+    call prepare (sbzts,sczts,sfzts,sszts,swzts,nz)
+
+  endif ! init x & z second derivative
+
+    ! allocate
+!    call alloc_x(temp1,mydeco)
+!    call alloc_z(temp3,mydeco)
+    ! transpose y to x & y to z
+    call transpose_y_to_x(temp,temp1,mydeco)
+    call transpose_y_to_z(temp,temp3,mydeco)
+
+    ! allocate
+!    call alloc_x(dtdxx,mydeco)
+!    call alloc_y(dtdxyz,mydeco)
+!    call alloc_z(dtdzz,mydeco)
+!    call alloc_x(di1,mydeco)
+!    call alloc_z(di3,mydeco)
+!    allocate(sx(mydeco%xsz(2),mydeco%xsz(3)))
+!    allocate(sz(mydeco%zsz(1),mydeco%zsz(2)))
+    ! x & z second derivative
+    call derxxts(dtdxx,temp1,di1,sx,sfxts,ssxts,swxts,mydeco%xsz(1),mydeco%xsz(2),mydeco%xsz(3),0)
+    call derzzts(dtdzz,temp3,di3,sz,sfzts,sszts,swzts,mydeco%zsz(1),mydeco%zsz(2),mydeco%zsz(3),0)
+
+    ! gather data in dm1 (y-pencil)
+    call transpose_x_to_y(dtdxx,dm1,mydeco)
+    call transpose_z_to_y(dtdzz,dtdxyz,mydeco)
+    dm1=dm1+dtdxyz
+
+  ! de-allocate memory
+!  if (allocated(temp1)) deallocate(temp1)
+!  if (allocated(temp3)) deallocate(temp3)
+!  if (allocated(dtdxx)) deallocate(dtdxx)
+!  if (allocated(dtdxyz)) deallocate(dtdxyz)
+!  if (allocated(dtdzz)) deallocate(dtdzz)
+!  if (allocated(di1)) deallocate(di1)
+!  if (allocated(di3)) deallocate(di3)
+!  if (allocated(sx)) deallocate(sx)
+!  if (allocated(sz)) deallocate(sz)
 
 end subroutine xzdiff_temp_solide
 
@@ -1098,50 +871,14 @@ subroutine test_sol_min_max(temp,y,n,ratio,repr)
   integer, dimension(3) :: mymax
   real(mytype) :: x, z, mysx, mysy, mysz
   real(mytype) :: phimax, phimin, phimax1, phimin1
-  real(mytype), dimension(ysize(1),n+1+2,ysize(3)) :: temp_obj
+!  real(mytype), dimension(ysize(1),n+1+2,ysize(3)) :: temp_obj
 
   ! Print min/max
   phimax=maxval(temp)
   phimin=minval(temp)
   call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,i)
   call MPI_REDUCE(phimin,phimin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,i)
-  if (nrank.eq.0) print *,'Temperature min-max : ',phimin1, phimax1
-
-  ! Check convergence on temperature
-  if (.false.) then
-    do k=1,ysize(3)
-      z=(k-1+ystart(3)-1)*dz
-      mysz=sin(twopi*z)
-    do j=1,n+1+2
-      mysy=sin(twopi*y(j))
-    do i=1,ysize(1)
-      x=(i-1+ystart(1)-1)*dx
-      mysx=sin(twopi*x)
-      temp_obj(i,j,k)= mysx*mysy*mysz*ratio*exp(-(twopi**2)*t*3./repr)
-    enddo
-    enddo
-    enddo
-    ! Norme L_infinie
-    phimax=maxval(abs(temp-temp_obj))
-    call MPI_ALLREDUCE(phimax,phimax1,1,real_type,MPI_MAX,MPI_COMM_WORLD,i)
-    if (nrank.eq.0) print *,'Norme T infinie = ',phimax1
-    if (phimax.eq.phimax1) then
-      mymax=maxloc(abs(temp-temp_obj))
-      print *,' at ',mymax+ystart,' on ',nrank
-    endif
-    ! Norme L2
-    phimax=sum((temp-temp_obj)**2)
-    call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_SUM,0,MPI_COMM_WORLD,i)
-    if (nrank.eq.0) phimax1=phimax1/(nx*nz*(n+1+2))
-    if (nrank.eq.0) print *,'Norme T2 (**1/2)= ',sqrt(phimax1)
-
-!    print *,'temperature calcul : '
-!    print *,(temp(1,i,1),i=1,ny_sol_bot+3)
-
-!    print *,'temperature delta : '
-!    print *,(temp(1,i,1)-temp_obj(1,i,1),i=1,ny_sol_bot+3)
-!    print *,maxloc(abs(temp-temp_obj))
-  endif
+  if (print_flag==1 .and. nrank.eq.0) print *,'Temperature min-max : ',phimin1, phimax1
 
 end subroutine test_sol_min_max
 
@@ -1179,9 +916,9 @@ subroutine solide_restart(will_write)
     call decomp_2d_write_var(fh,disp,2,top_dm2 ,mydecomp_top)
     call decomp_2d_write_var(fh,disp,2,top_dm3 ,mydecomp_top)
     call MPI_FILE_CLOSE(fh,ierror)
-    write(compteur,'(I3.3)') itime/isave
-    call decomp_2d_write_one(2,temp_bot,'temp_bot'//compteur,mydecomp_bot)
-    call decomp_2d_write_one(2,temp_top,'temp_top'//compteur,mydecomp_top)
+    !write(compteur,'(I3.3)') itime/isave
+    !call decomp_2d_write_one(2,temp_bot,'temp_bot'//compteur,mydecomp_bot)
+    !call decomp_2d_write_one(2,temp_top,'temp_top'//compteur,mydecomp_top)
   else ! read restart file
     call MPI_FILE_OPEN(MPI_COMM_WORLD, 'solide.dat', &
          MPI_MODE_RDONLY, MPI_INFO_NULL, &
@@ -1204,13 +941,15 @@ subroutine update_solide_stats()
 !
 !  Subroutine updating statistics
 !
-  use decomp_2d, only : nrank
+  use decomp_2d, only : nrank, ysize
   use param, only : itime
 
   implicit none
 
   ! Local variables
   integer :: coeff
+  real(mytype), dimension(ysize(1),ny_sol_bot+1+2,ysize(3)) :: deltab
+  real(mytype), dimension(ysize(1),ny_sol_top+1+2,ysize(3)) :: deltat
 
   coeff=itime-beg_stat_sol
   if (coeff.le.0) then
@@ -1220,9 +959,22 @@ subroutine update_solide_stats()
 
   tempm_1_bot=((coeff-1)*1./coeff)*tempm_1_bot + (1./coeff)*temp_bot
   tempm_2_bot=((coeff-1)*1./coeff)*tempm_2_bot + (1./coeff)*temp_bot**2
+  if (.true.) then
+    call ydiff_temp_solide(deltab,temp_bot,d2pn_bot,ny_sol_bot)
+    deltab=bot_dm1*repr_sol_bot+(1.-sol_imp_var)*deltab
+    tdeltat_bot=((coeff-1)*1./coeff)*tdeltat_bot + (1./coeff)*deltab
+  endif
+  !if (mod(itime,20).eq.0) then
+  !  call ydery_temp_sol(temp_bot,yp_bot,ny_sol_bot,mydecomp_bot)
+  !endif
 
   tempm_1_top=((coeff-1)*1./coeff)*tempm_1_top + (1./coeff)*temp_top
   tempm_2_top=((coeff-1)*1./coeff)*tempm_2_top + (1./coeff)*temp_top**2
+  if (.true.) then
+    call ydiff_temp_solide(deltat,temp_top,d2pn_top,ny_sol_top)
+    deltat=top_dm1*repr_sol_top+(1.-sol_imp_var)*deltat
+    tdeltat_top=((coeff-1)*1./coeff)*tdeltat_top + (1./coeff)*deltat
+  endif
 
 end subroutine update_solide_stats
 
@@ -1245,8 +997,10 @@ subroutine solide_stats_restart(will_write)
   if (will_write) then ! write restart file
     call decomp_2d_write_one(2,tempm_1_bot,'sol_bot_tempm.dat' ,mydecomp_bot)
     call decomp_2d_write_one(2,tempm_2_bot,'sol_bot_temp2m.dat',mydecomp_bot)
+    call decomp_2d_write_one(2,tdeltat_bot,'sol_bot_td2tm.dat',mydecomp_bot)
     call decomp_2d_write_one(2,tempm_1_top,'sol_top_tempm.dat' ,mydecomp_top)
     call decomp_2d_write_one(2,tempm_2_top,'sol_top_temp2m.dat',mydecomp_top)
+    call decomp_2d_write_one(2,tdeltat_top,'sol_top_td2tm.dat',mydecomp_top)
   else ! read restart file
     INQUIRE(FILE='sol_bot_tempm.dat', EXIST=file_exist)
     if (file_exist) then
@@ -1260,6 +1014,12 @@ subroutine solide_stats_restart(will_write)
     else
       tempm_2_bot=0.
     endif
+    INQUIRE(FILE='sol_bot_td2tm.dat', EXIST=file_exist)
+    if (file_exist) then
+      call decomp_2d_read_one(2,tdeltat_bot,'sol_bot_td2tm.dat',mydecomp_bot)
+    else
+      tdeltat_bot=0.
+    endif
     INQUIRE(FILE='sol_top_tempm.dat', EXIST=file_exist)
     if (file_exist) then
       call decomp_2d_read_one(2,tempm_1_top,'sol_top_tempm.dat',mydecomp_top)
@@ -1271,6 +1031,12 @@ subroutine solide_stats_restart(will_write)
       call decomp_2d_read_one(2,tempm_2_top,'sol_top_temp2m.dat',mydecomp_top)
     else
       tempm_2_top=0.
+    endif
+    INQUIRE(FILE='sol_top_td2tm.dat', EXIST=file_exist)
+    if (file_exist) then
+      call decomp_2d_read_one(2,tdeltat_top,'sol_top_td2tm.dat',mydecomp_top)
+    else
+      tdeltat_top=0.
     endif
   endif
 
@@ -1287,22 +1053,26 @@ subroutine allocate_solide_stats()
   ! bottom
   allocate( tempm_1_bot(ysize(1),ny_sol_bot+1+2,ysize(3)) )
   allocate( tempm_2_bot(ysize(1),ny_sol_bot+1+2,ysize(3)) )
+  allocate( tdeltat_bot(ysize(1),ny_sol_bot+1+2,ysize(3)) )
   tempm_1_bot=0.
   tempm_2_bot=0.
+  tdeltat_bot=0.
 
   ! top
   allocate( tempm_1_top(ysize(1),ny_sol_top+1+2,ysize(3)) )
   allocate( tempm_2_top(ysize(1),ny_sol_top+1+2,ysize(3)) )
+  allocate( tdeltat_top(ysize(1),ny_sol_top+1+2,ysize(3)) )
   tempm_1_top=0.
   tempm_2_top=0.
+  tdeltat_top=0.
 
 end subroutine allocate_solide_stats
 
 subroutine my2decomp_solide()
 !
-! 2DECOMP information ONLY for Y-stencil MPI IO
+! 2DECOMP information for MPI IO & X-diff & Z-diff
 !
-  use decomp_2d, only : ysize, ystart, get_decomp_info
+  use decomp_2d, only : get_decomp_info, decomp_info_init
 
   implicit none
 
@@ -1310,27 +1080,293 @@ subroutine my2decomp_solide()
 
   call get_decomp_info(decomp_main)
 
-  ! Define solid 2DECOMP Y-stencil information
-  ! xsz(1), ysz(2), zsz(3) : total domain size
-  mydecomp_bot%xsz(1)=decomp_main%xsz(1)
-  mydecomp_bot%ysz(2)=ny_sol_bot+1+2
-  mydecomp_bot%zsz(3)=decomp_main%zsz(3)
-  mydecomp_top%xsz(1)=decomp_main%xsz(1)
-  mydecomp_top%ysz(2)=ny_sol_top+1+2
-  mydecomp_top%zsz(3)=decomp_main%zsz(3)
-  ! ysz(1), ysz(3) : local domain size
-  mydecomp_bot%ysz(1)=ysize(1)
-  mydecomp_bot%ysz(3)=ysize(3)
-  mydecomp_top%ysz(1)=ysize(1)
-  mydecomp_top%ysz(3)=ysize(3)
-  ! yst(1), yst(2), yst(3) : local domain location
-  mydecomp_bot%yst(1)=ystart(1)
-  mydecomp_bot%yst(2)=1
-  mydecomp_bot%yst(3)=ystart(3)
-  mydecomp_top%yst(1)=ystart(1)
-  mydecomp_top%yst(2)=1
-  mydecomp_top%yst(3)=ystart(3)
+  call decomp_info_init(decomp_main%xsz(1),ny_sol_bot+1+2, decomp_main%zsz(3),mydecomp_bot)
+  call decomp_info_init(decomp_main%xsz(1),ny_sol_top+1+2, decomp_main%zsz(3),mydecomp_top)
+
+if (decomp_main%ysz(1).ne.mydecomp_bot%ysz(1)) then
+  print *,'Error in mydecomp_bot : ',mydecomp_bot%ysz
+endif
+if (decomp_main%ysz(3).ne.mydecomp_bot%ysz(3)) then
+  print *,'Error in mydecomp_bot : ',mydecomp_bot%ysz
+endif
+if (decomp_main%ysz(1).ne.mydecomp_top%ysz(1)) then
+  print *,'Error in mydecomp_top : ',mydecomp_top%ysz
+endif
+if (decomp_main%ysz(3).ne.mydecomp_top%ysz(3)) then
+  print *,'Error in mydecomp_top : ',mydecomp_top%ysz
+endif
 
 end subroutine my2decomp_solide
+
+subroutine derxxts(tx,ux,rx,sx,sfx,ssx,swx,nx,ny,nz,npaire) 
+
+implicit none
+
+integer :: nx,ny,nz,npaire,i,j,k 
+real(mytype), dimension(nx,ny,nz) :: tx,ux,rx
+real(mytype), dimension(ny,nz) :: sx
+real(mytype),  dimension(nx):: sfx,ssx,swx 
+
+   do k=1,nz
+   do j=1,ny
+      tx(1,j,k)=asixts*(ux(2,j,k)-ux(1   ,j,k)&
+           -ux(1,j,k)+ux(nx  ,j,k))&
+           +bsixts*(ux(3,j,k)-ux(1   ,j,k)&
+           -ux(1,j,k)+ux(nx-1,j,k))&
+           +csixts*(ux(4,j,k)-ux(1   ,j,k)&
+           -ux(1,j,k)+ux(nx-2,j,k))
+      rx(1,j,k)=-1.
+      tx(2,j,k)=asixts*(ux(3,j,k)-ux(2   ,j,k)&
+           -ux(2,j,k)+ux(1   ,j,k))&
+           +bsixts*(ux(4,j,k)-ux(2   ,j,k)&
+           -ux(2,j,k)+ux(nx  ,j,k))&
+           +csixts*(ux(5,j,k)-ux(2   ,j,k)&
+           -ux(2,j,k)+ux(nx-1,j,k))
+      rx(2,j,k)=0.
+      tx(3,j,k)=asixts*(ux(4,j,k)-ux(3 ,j,k)&
+           -ux(3,j,k)+ux(2 ,j,k))&
+           +bsixts*(ux(5,j,k)-ux(3 ,j,k)&
+           -ux(3,j,k)+ux(1 ,j,k))&
+           +csixts*(ux(6,j,k)-ux(3 ,j,k)&
+           -ux(3,j,k)+ux(nx,j,k))
+      rx(3,j,k)=0.
+      do i=4,nx-3
+         tx(i,j,k)=asixts*(ux(i+1,j,k)-ux(i  ,j,k)&
+              -ux(i  ,j,k)+ux(i-1,j,k))&
+              +bsixts*(ux(i+2,j,k)-ux(i  ,j,k)&
+              -ux(i  ,j,k)+ux(i-2,j,k))&
+              +csixts*(ux(i+3,j,k)-ux(i  ,j,k)&
+              -ux(i  ,j,k)+ux(i-3,j,k))
+         rx(i,j,k)=0.
+      enddo
+      tx(nx-2,j,k)=asixts*(ux(nx-1,j,k)-ux(nx-2,j,k)&
+           -ux(nx-2,j,k)+ux(nx-3,j,k))&
+           +bsixts*(ux(nx  ,j,k)-ux(nx-2,j,k)&
+           -ux(nx-2,j,k)+ux(nx-4,j,k))&
+           +csixts*(ux(1   ,j,k)-ux(nx-2,j,k)&
+           -ux(nx-2,j,k)+ux(nx-5,j,k))
+      rx(nx-2,j,k)=0.
+      tx(nx-1,j,k)=asixts*(ux(nx  ,j,k)-ux(nx-1,j,k)&
+           -ux(nx-1,j,k)+ux(nx-2,j,k))&
+           +bsixts*(ux(1   ,j,k)-ux(nx-1,j,k)&
+           -ux(nx-1,j,k)+ux(nx-3,j,k))&
+           +csixts*(ux(2   ,j,k)-ux(nx-1,j,k)&
+           -ux(nx-1,j,k)+ux(nx-4,j,k))
+      rx(nx-1,j,k)=0.
+      tx(nx  ,j,k)=asixts*(ux(1 ,j,k)-ux(nx  ,j,k)&
+           -ux(nx,j,k)+ux(nx-1,j,k))&
+           +bsixts*(ux(2 ,j,k)-ux(nx  ,j,k)&
+           -ux(nx,j,k)+ux(nx-2,j,k))&
+           +csixts*(ux(3 ,j,k)-ux(nx  ,j,k)&
+           -ux(nx,j,k)+ux(nx-3,j,k))
+      rx(nx  ,j,k)=alsaixts
+      do i=2,nx
+         tx(i,j,k)=tx(i,j,k)-tx(i-1,j,k)*ssx(i)
+         rx(i,j,k)=rx(i,j,k)-rx(i-1,j,k)*ssx(i)
+      enddo
+         tx(nx,j,k)=tx(nx,j,k)*swx(nx)
+         rx(nx,j,k)=rx(nx,j,k)*swx(nx)
+      do i=nx-1,1,-1
+         tx(i,j,k)=(tx(i,j,k)-sfx(i)*tx(i+1,j,k))*swx(i)
+         rx(i,j,k)=(rx(i,j,k)-sfx(i)*rx(i+1,j,k))*swx(i)
+      enddo
+      sx(j,k)=(   tx(1,j,k)-alsaixts*tx(nx,j,k))/&
+           (1.+rx(1,j,k)-alsaixts*rx(nx,j,k))
+      do i=1,nx
+         tx(i,j,k)=tx(i,j,k)-sx(j,k)*rx(i,j,k)
+      enddo
+   enddo
+   enddo
+
+return  
+
+end subroutine derxxts
+
+subroutine derzzts(tz,uz,rz,sz,sfz,ssz,swz,nx,ny,nz,npaire) 
+
+implicit none
+
+integer :: nx,ny,nz,npaire,i,j,k
+real(mytype), dimension(nx,ny,nz) :: tz,uz,rz
+real(mytype), dimension(nx,ny) :: sz 
+real(mytype), dimension(nz) :: sfz,ssz,swz
+
+   do j=1,ny
+   do i=1,nx
+      tz(i,j,1)=askzts*(uz(i,j,2)-uz(i,j,1   )&
+           -uz(i,j,1)+uz(i,j,nz  ))&
+           +bskzts*(uz(i,j,3)-uz(i,j,1   )&
+           -uz(i,j,1)+uz(i,j,nz-1))&
+           +cskzts*(uz(i,j,4)-uz(i,j,1   )&
+           -uz(i,j,1)+uz(i,j,nz-2))
+      rz(i,j,1)=-1.
+      tz(i,j,2)=askzts*(uz(i,j,3)-uz(i,j,2 )&
+           -uz(i,j,2)+uz(i,j,1 ))&
+           +bskzts*(uz(i,j,4)-uz(i,j,2 )&
+           -uz(i,j,2)+uz(i,j,nz))&
+           +cskzts*(uz(i,j,5)-uz(i,j,2 )&
+           -uz(i,j,2)+uz(i,j,nz-1))
+      rz(i,j,2)=0.
+      tz(i,j,3)=askzts*(uz(i,j,4)-uz(i,j,3 )&
+           -uz(i,j,3)+uz(i,j,2 ))&
+           +bskzts*(uz(i,j,5)-uz(i,j,3 )&
+           -uz(i,j,3)+uz(i,j,1 ))&
+           +cskzts*(uz(i,j,6)-uz(i,j,3 )&
+           -uz(i,j,3)+uz(i,j,nz))
+      rz(i,j,3)=0.
+   enddo
+   enddo
+   do k=4,nz-3
+   do j=1,ny
+   do i=1,nx
+      tz(i,j,k)=askzts*(uz(i,j,k+1)-uz(i,j,k  )&
+           -uz(i,j,k  )+uz(i,j,k-1))&
+           +bskzts*(uz(i,j,k+2)-uz(i,j,k  )&
+           -uz(i,j,k  )+uz(i,j,k-2))&
+           +cskzts*(uz(i,j,k+3)-uz(i,j,k  )&
+           -uz(i,j,k  )+uz(i,j,k-3))
+      rz(i,j,k)=0.
+   enddo
+   enddo
+   enddo
+   do j=1,ny
+   do i=1,nx
+      tz(i,j,nz-2)=askzts*(uz(i,j,nz-1)-uz(i,j,nz-2)&
+           -uz(i,j,nz-2)+uz(i,j,nz-3))&
+           +bskzts*(uz(i,j,nz  )-uz(i,j,nz-2)&
+           -uz(i,j,nz-2)+uz(i,j,nz-4))&
+           +cskzts*(uz(i,j,1   )-uz(i,j,nz-2)&
+           -uz(i,j,nz-2)+uz(i,j,nz-5))
+      rz(i,j,nz-2)=0.
+      tz(i,j,nz-1)=askzts*(uz(i,j,nz  )-uz(i,j,nz-1)&
+           -uz(i,j,nz-1)+uz(i,j,nz-2))&
+           +bskzts*(uz(i,j,1   )-uz(i,j,nz-1)&
+           -uz(i,j,nz-1)+uz(i,j,nz-3))&
+           +cskzts*(uz(i,j,2   )-uz(i,j,nz-1)&
+           -uz(i,j,nz-1)+uz(i,j,nz-4))
+      rz(i,j,nz-1)=0.
+      tz(i,j,nz  )=askzts*(uz(i,j,1 )-uz(i,j,nz  )&
+           -uz(i,j,nz)+uz(i,j,nz-1))&
+           +bskzts*(uz(i,j,2 )-uz(i,j,nz  )&
+           -uz(i,j,nz)+uz(i,j,nz-2))&
+           +cskzts*(uz(i,j,3 )-uz(i,j,nz  )&
+           -uz(i,j,nz)+uz(i,j,nz-3))
+      rz(i,j,nz  )=alsakzts
+   enddo
+   enddo
+   do k=2,nz
+   do j=1,ny
+   do i=1,nx
+      tz(i,j,k)=tz(i,j,k)-tz(i,j,k-1)*ssz(k)
+      rz(i,j,k)=rz(i,j,k)-rz(i,j,k-1)*ssz(k)
+   enddo
+   enddo
+   enddo
+   do j=1,ny
+   do i=1,nx
+      tz(i,j,nz)=tz(i,j,nz)*swz(nz)
+      rz(i,j,nz)=rz(i,j,nz)*swz(nz)
+   enddo
+   enddo
+   do k=nz-1,1,-1
+   do j=1,ny
+   do i=1,nx
+      tz(i,j,k)=(tz(i,j,k)-sfz(k)*tz(i,j,k+1))*swz(k)
+      rz(i,j,k)=(rz(i,j,k)-sfz(k)*rz(i,j,k+1))*swz(k)
+   enddo
+   enddo
+   enddo
+   do j=1,ny
+   do i=1,nx
+      sz(i,j)=(   tz(i,j,1)-alsakzts*tz(i,j,nz))/&
+           (1.+rz(i,j,1)-alsakzts*rz(i,j,nz))
+   enddo
+   enddo
+   do k=1,nz
+   do j=1,ny
+   do i=1,nx
+      tz(i,j,k)=tz(i,j,k)-sz(i,j)*rz(i,j,k)
+   enddo
+   enddo
+   enddo
+
+return
+
+end subroutine derzzts
+
+subroutine ydery_temp_sol(temp,y,n,decomp)
+
+  use decomp_2d_io, only : decomp_2d_write_plane
+  use param, only : itime
+
+  implicit none
+
+  integer, parameter :: nplan_sol=4
+  ! IO variables
+  type(decomp_info), intent(in) :: decomp
+  integer, intent(in) :: n
+  real(mytype), dimension(n+1+2), intent(in) :: y
+  real(mytype), dimension(decomp%ysz(1),n+1+2,decomp%ysz(3)), intent(in) :: temp
+  ! Local variables
+  integer :: i,j,k
+  integer, dimension(nplan_sol) :: jtarget
+  real(mytype), dimension(nplan_sol) :: ytarget, d1li, myprod
+  real(mytype), dimension(decomp%ysz(1),2*nplan_sol,decomp%ysz(3)) :: output
+  character(len=10) :: timer
+
+  output=0.
+
+  jtarget(1) = 131 ! y=0 pour n=128
+  jtarget(2) = 115 ! y+=-5 pour n=128
+  jtarget(3) = 104 ! y+=-15 pour n=128
+  jtarget(4) = 65 ! demi-hauteur pour n=128
+  do j=1,nplan_sol
+    ytarget(j)=y(jtarget(j))
+  enddo
+
+  if (.not.allocated(mat_dery)) then
+    allocate(mat_dery(nplan_sol,n+1))
+    do i=1,n+1
+      d1li=0.
+      do k=1,n+1
+      if (k.ne.i) then
+        myprod=1.
+        do j=1,n+1
+        if ((j.ne.i).and.(j.ne.k)) then
+          myprod=myprod*(ytarget-y(j+1))/(y(i+1)-y(j+1))
+        endif
+        enddo
+        d1li=d1li+myprod/(y(i+1)-y(k+1))
+      endif
+      enddo
+      mat_dery(:,i)=d1li
+    enddo
+  endif
+
+  ! temperature & normal derivative
+  do j=1,nplan_sol
+    output(:,2*j-1,:) = temp(:,jtarget(j),:)
+    output(:,2*j,:) = 0.
+    do i=1,n+1
+      output(:,2*j,:) = output(:,2*j,:) + &
+        mat_dery(j,i)*temp(:,i+1,:)
+    enddo
+  enddo
+
+  ! Write to disk
+154 format('t',I9.9)
+  write(timer,154) itime
+  call decomp_2d_write_plane(2,output,5,nplan_sol*2,'slices/tdyt_sol_'//timer//'.dat',decomp)
+!  j=1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/temp_sol_j131_'//timer//'.dat',decomp); j=j+1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/dy_t_sol_j131_'//timer//'.dat',decomp); j=j+1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/temp_sol_j115_'//timer//'.dat',decomp); j=j+1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/dy_t_sol_j115_'//timer//'.dat',decomp); j=j+1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/temp_sol_j104_'//timer//'.dat',decomp); j=j+1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/dy_t_sol_j104_'//timer//'.dat',decomp); j=j+1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/temp_sol_j065_'//timer//'.dat',decomp); j=j+1
+!  call decomp_2d_write_plane(2,output,5,j,'slices/dy_t_sol_j065_'//timer//'.dat',decomp)
+
+end subroutine ydery_temp_sol
 
 end module conjugate_ht

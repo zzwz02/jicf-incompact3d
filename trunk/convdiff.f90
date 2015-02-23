@@ -52,7 +52,6 @@ real(mytype),dimension(zsize(1),zsize(2),zsize(3)) :: ux3,uy3,uz3
 real(mytype),dimension(zsize(1),zsize(2),zsize(3)) :: ta3,tb3,tc3,td3,te3,tf3,tg3,th3,ti3,di3
 
 integer :: ijk,nvect1,nvect2,nvect3,i,j,k
-!real(mytype) :: x,y,z
 
 nvect1=xsize(1)*xsize(2)*xsize(3)
 nvect2=ysize(1)*ysize(2)*ysize(3)

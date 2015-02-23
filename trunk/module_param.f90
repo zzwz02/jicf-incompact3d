@@ -51,9 +51,7 @@ module variables
 !nvisu = size for visualization collection
 !xjicf is the X-coordinate of the centre of JICF
 !rjicf is the radius of JICF hole
-!wall_bc: 1. iso-heat on the wall; 2. iso-flux on the wall
 integer,parameter :: nx=256+1,ny=96+1,nz=128,rezone=114,xjicf=186
-integer,parameter :: wall_bc=1
 integer,parameter :: nstat=1,nvisu=1
 integer,parameter :: p_row=0,p_col=0
 integer,parameter :: nxm=nx-1,nym=ny-1,nzm=nz
@@ -166,7 +164,7 @@ end module variables
 module param
 
 use decomp_2d, only : mytype
-  integer, save :: nclx,ncly,nclz,print_flag,print_interval,njicf,ibm_y_max
+  integer, save :: nclx,ncly,nclz,print_flag=1,print_interval,njicf,ibm_y_max,diverge=0
   integer, save :: ifft, ivirt,istret,iforc_entree,iturb
   integer, save :: itype, iskew, iin, nscheme, ifirst, ilast, iles
   integer, save :: isave,ilit,idebmod, imodulo, idemarre, icommence, irecord

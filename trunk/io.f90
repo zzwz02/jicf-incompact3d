@@ -492,6 +492,7 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine write_plane_3d_real(ipencil,var,iplane,n,filename, &
        opt_decomp)
+
     implicit none
 
     integer, intent(IN) :: ipencil !(x-pencil=1; y-pencil=2; z-pencil=3)
@@ -518,6 +519,7 @@ contains
 
   subroutine write_plane_3d_complex(ipencil,var,iplane,n, &
        filename,opt_decomp)
+
     implicit none
 
     integer, intent(IN) :: ipencil !(x-pencil=1; y-pencil=2; z-pencil=3)
@@ -547,6 +549,7 @@ contains
   subroutine write_plane_3d_real_re(ipencil,var,iplane,n,filename, &
        opt_decomp)
     use variables, only : rezone
+    
     implicit none
 
     integer, intent(IN) :: ipencil !(x-pencil=1; y-pencil=2; z-pencil=3)
@@ -574,6 +577,7 @@ contains
   subroutine write_plane_3d_complex_re(ipencil,var,iplane,n, &
        filename,opt_decomp)
     use variables, only : rezone
+    
     implicit none
 
     integer, intent(IN) :: ipencil !(x-pencil=1; y-pencil=2; z-pencil=3)

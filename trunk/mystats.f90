@@ -73,6 +73,7 @@ if (iscalar.eq.1) then
   !
 endif
 
+return
 end subroutine allocate_user_stats
 
 subroutine update_user_stats_non_phi(ux,uy,uz,phG,ph1,ph2,ph3,ph4)
@@ -106,6 +107,7 @@ uvm = ((coeff-1)*1./coeff)*uvm + (1./coeff)*fine_interpol(ux*uy)
 uwm = ((coeff-1)*1./coeff)*uwm + (1./coeff)*fine_interpol(ux*uz)
 vwm = ((coeff-1)*1./coeff)*vwm + (1./coeff)*fine_interpol(uy*uz)
 
+return
 end subroutine update_user_stats_non_phi
 
 subroutine update_user_stats_oui_phi(ux,uy,uz,phi,phG,ph1,ph2,ph3,ph4)
@@ -137,6 +139,7 @@ vphim = ((coeff-1)*1./coeff)*vphim + (1./coeff)*fine_interpol(uy*phi)
 wphim = ((coeff-1)*1./coeff)*wphim + (1./coeff)*fine_interpol(uz*phi)
 phiphim = ((coeff-1)*1./coeff)*phiphim + (1./coeff)*fine_interpol(phi*phi)
 
+return
 end subroutine update_user_stats_oui_phi
 
 subroutine pre_update_user_stats(phG,ph1,ph2,ph3,ph4)
@@ -261,6 +264,7 @@ endif
     call update_user_stats(ux1,uy1,uz1,phG,ph1,ph2,ph3,ph4)
   endif
 
+return
 end subroutine pre_update_user_stats
 
 subroutine write_user_stats(phG,ph1,ph2,ph3,ph4)
@@ -295,6 +299,7 @@ if (iscalar.eq.1) then
   !
 endif
 
+return
 end subroutine write_user_stats
 
 function fine_interpol(var)
@@ -371,6 +376,7 @@ subroutine read_user_stats(phG,ph1,ph2,ph3,ph4)
     !
   endif
 
+return
 end subroutine read_user_stats
 
 subroutine read_one_user_stat(filename,var)
@@ -417,6 +423,7 @@ subroutine read_one_user_stat(filename,var)
     !
   endif
 
+  return
 end subroutine read_one_user_stat
 
 subroutine plot_my_stats()
@@ -478,6 +485,7 @@ endif
 
 call transpose_y_to_x(ta2,td1)!dudy
 
+return
 end subroutine
 
 end module user_stats
