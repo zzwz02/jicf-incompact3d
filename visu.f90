@@ -29,7 +29,7 @@
 !    problems with up to 0(10^5) computational cores, Int. J. of Numerical 
 !    Methods in Fluids, vol 67 (11), pp 1735-1757
 !################################################################################
-!#define my_mod_solide
+#define my_mod_solide
 !############################################################################
 !
 subroutine VISU_INSTA (ux1,uy1,uz1,phi1,ta1,tb1,tc1,td1,te1,tf1,tg1,th1,ti1,di1,&
@@ -44,7 +44,7 @@ USE decomp_2d
 USE decomp_2d_io
 use user_stats, only : beg_stat
 #ifdef my_mod_solide
-use conjugate_ht, only : temp_bot,temp_top
+use conjugate_ht, only : temp_bot,temp_top,mydecomp_bot,mydecomp_top
 #endif
 
 implicit none
@@ -55,6 +55,8 @@ real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ta1,tb1,tc1,td1,te1,tf1,tg
 real(mytype),dimension(ysize(1),ysize(2),ysize(3)) :: ta2,tb2,tc2,td2,te2,tf2,tg2,th2,ti2,tj2,di2
 real(mytype),dimension(zsize(1),zsize(2),zsize(3)) :: ta3,tb3,tc3,td3,te3,tf3,tg3,th3,ti3,di3
 real(mytype),dimension(xszV(1),xszV(2),xszV(3)) :: uvisu 
+real(mytype),dimension(mydecomp_bot%xsz(1),mydecomp_bot%xsz(2), &
+                       mydecomp_bot%xsz(3)) :: temp1
 
 integer :: code,icomplet
 integer :: ijk,nvect1,nvect2,nvect3,i,j,k
@@ -148,16 +150,19 @@ call fine_to_coarseV(1,phi1,uvisu)
 !   call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !        1,phi1,filename)
 #ifdef my_mod_solide
-uvisu=0.
-call fine_to_coarseV(2,temp_bot,uvisu)
+!call transpose_y_to_x(temp_bot,temp1,mydecomp_bot)
+!uvisu=0.
+!call fine_to_coarseV(2,temp,uvisu)
 997 format('temp_bot',I3.3)
-   write(filename, 997) itime/imodulo
-   call decomp_2d_write_one(2,uvisu,filename,2)
-uvisu=0.
-call fine_to_coarseV(2,temp_top,uvisu)
-998 format('temp_bot',I3.3)
-   write(filename, 998) itime/imodulo
-   call decomp_2d_write_one(2,uvisu,filename,2)
+   write(filename, 997) (itime-beg_stat)/imodulo
+   call decomp_2d_write_one(2,temp_bot,filename,mydecomp_bot)
+   
+!call transpose_y_to_x(temp_top,temp1,mydecomp_top)
+!uvisu=0.
+!call fine_to_coarseV(2,temp1,uvisu)
+998 format('temp_top',I3.3)
+   write(filename, 998) (itime-beg_stat)/imodulo
+   call decomp_2d_write_one(2,temp_top,filename,mydecomp_top)
 !   call decomp_2d_write_one(nx_global,ny_global,nz_global,&
 !        1,phi1,filename)
 #endif

@@ -90,6 +90,8 @@ real(mytype), dimension(nz) :: sfzt,sczt,sbzt,sszt,swzt
 real(mytype), dimension(nz) :: sfzpt,sszpt,swzpt
 !!my own scalar subroutine.
 real(mytype), dimension(2*ny,2*ny) :: scalar_left_main,scalar_left_jet
+real(mytype), save, allocatable, dimension(:,:) :: injet_x
+logical, save, allocatable, dimension(:,:) :: injet_y
 
 !module implicit
 real(mytype), dimension(ny) :: aam,bbm,ccm,ddm,eem,ggm,hhm,wwm,zzm !!TIME IMPLICIT, ncl=2

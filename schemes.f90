@@ -48,6 +48,8 @@ implicit none
 integer  :: i,j,k
 real(mytype) :: fpi2, fpi2t
 
+if (nrank==0) print *,'Calculating schemes parameters...'
+
 alfa1x= 2.
 af1x  =-(5./2.  )/dx
 bf1x  = (   2.  )/dx
@@ -100,12 +102,12 @@ bsix  =((-3.+24.*alsaix)/5.)/(4.*dx2)
 csix  =((2.-11.*alsaix)/20.)/(9.*dx2)
 !      stop
 if (nrank==0) then
-      write(*,*) '=== derxx ==='
-      write(*,*) alsaix
-      write(*,*) asix*dx2
-      write(*,*) bsix*4*dx2
-      write(*,*) csix*9*dx2
-      write(*,*) '============='
+      write(*,*) '   === derxx ==='
+      write(*,*) '   ',alsaix
+      write(*,*) '   ',asix*dx2
+      write(*,*) '   ',bsix*4*dx2
+      write(*,*) '   ',csix*9*dx2
+      write(*,*) '   ============='
 endif
 alfa1y= 2.
 af1y  =-(5./2.  )/dy
@@ -155,12 +157,12 @@ asjy  =((6.-9.*alsajy)/4.)/dy2
 bsjy  =((-3.+24.*alsajy)/5.)/(4.*dy2)
 csjy  =((2.-11.*alsajy)/20.)/(9.*dy2)
 if (nrank==0) then
-      write(*,*) '=== deryy ==='
-      write(*,*) alsajy
-      write(*,*) asjy*dy2
-      write(*,*) bsjy*4*dy2
-      write(*,*) csjy*9*dy2
-      write(*,*) '============='
+      write(*,*) '   === deryy ==='
+      write(*,*) '   ',alsajy
+      write(*,*) '   ',asjy*dy2
+      write(*,*) '   ',bsjy*4*dy2
+      write(*,*) '   ',csjy*9*dy2
+      write(*,*) '   ============='
 endif
 
 alcaix6=9./62. 
@@ -237,7 +239,7 @@ cicix6=1./256.*(-10.*ailcaix6+3.-640.*2.*dicix6)
 !aicix6=1./128.*(75.+70.*ailcaix6-320.*2.*dicix6)
 !bicix6=1./256.*(126.*ailcaix6-25.+1152.*2.*dicix6)
 !cicix6=1./256.*(-10.*ailcaix6+3.-640.*2.*dicix6)
-if (nrank==0) print *,'New coef Inter X',aicix6,bicix6,cicix6,dicix6
+if (nrank==0) print *,'   New coef Inter X',aicix6,bicix6,cicix6,dicix6
 cifx6(1)=ailcaix6 
 cifx6(2)=ailcaix6 
 cifx6(nxm-2)=ailcaix6 
@@ -354,7 +356,7 @@ ciciy6=1./256.*(-10.*ailcaiy6+3.-640.*2.*diciy6)
 !aiciy6=1./128.*(75.+70.*ailcaiy6-320.*2.*diciy6)
 !biciy6=1./256.*(126.*ailcaiy6-25.+1152.*2.*diciy6)
 !ciciy6=1./256.*(-10.*ailcaiy6+3.-640.*2.*diciy6)
-if (nrank==0) print *,'New coef Inter Y',aiciy6,biciy6,ciciy6,diciy6
+if (nrank==0) print *,'   New coef Inter Y',aiciy6,biciy6,ciciy6,diciy6
 cify6(1)=ailcaiy6 
 cify6(2)=ailcaiy6 
 cify6(nym-2)=ailcaiy6 
@@ -472,7 +474,7 @@ enddo
 !   aiciz6=1./128.*(75.+70.*ailcaiz6-320.*2.*diciz6)
 !   biciz6=1./256.*(126.*ailcaiz6-25.+1152.*2.*diciz6)
 !   ciciz6=1./256.*(-10.*ailcaiz6+3.-640.*2.*diciz6)
-   if (nrank==0) print *,'New coef Inter Z',aiciz6,biciz6,ciciz6,diciz6
+   if (nrank==0) print *,'   New coef Inter Z',aiciz6,biciz6,ciciz6,diciz6
    cifz6(1)=ailcaiz6 
    cifz6(2)=ailcaiz6 
    cifz6(nzm-2)=ailcaiz6 
@@ -564,12 +566,12 @@ enddo
          bskz  =((-3.+24.*alsakz)/5.)/(4.*dz2)
          cskz  =((2.-11.*alsakz)/20.)/(9.*dz2)
 if (nrank==0) then
-         write(*,*) '=== derzz ==='
-         write(*,*) alsakz
-         write(*,*) askz*dz2
-         write(*,*) bskz*4*dz2
-         write(*,*) cskz*9*dz2
-         write(*,*) '============='
+         write(*,*) '   === derzz ==='
+         write(*,*) '   ',alsakz
+         write(*,*) '   ',askz*dz2
+         write(*,*) '   ',bskz*4*dz2
+         write(*,*) '   ',cskz*9*dz2
+         write(*,*) '   ============='
 endif
 #endif
 
@@ -1217,17 +1219,18 @@ endif
 
 if (iscalar==1) then
 alpha_0 =0.
-beta_0  =1.
+beta_0  =-1.
 g_0     =0.
 alpha_n =0.
 beta_n  =1.
 g_n     =0.
 
 if (iimplicit==0) then
-  if (nrank==0) print *,' begining constructing scalar_left_main  Matrix'
+  call scalar_schemes(fpi2t)
+  if (nrank==0) print *,'   begining constructing scalar_left_main Matrix'
   call scalar_schemes_exp(alpha_0,beta_0,alpha_n,beta_n,scalar_left_main)
-  if (nrank==0) print *,' begining constructing scalar_left_jet  Matrix'
-  call scalar_schemes_exp(1,0,alpha_n,beta_n,scalar_left_jet)
+  if (nrank==0) print *,'   begining constructing scalar_left_jet Matrix'
+  call scalar_schemes_exp(1,0,1,0,scalar_left_jet)
 else
   call implicit_schemes()
   call scalar_schemes(fpi2t)

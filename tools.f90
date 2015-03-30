@@ -162,6 +162,7 @@ TYPE(DECOMP_INFO) :: phG
 integer :: i,j,k,irestart,nzmsize,fh,ierror,code
 integer, dimension(2) :: dims, dummy_coords
 logical, dimension(2) :: dummy_periods
+real(mytype) :: r2,tempa,tempb
 
 real(mytype), dimension(xsize(1),xsize(2),xsize(3)) :: ux1,uy1,uz1,ep1
 real(mytype), dimension(xsize(1),xsize(2),xsize(3)) :: gx1,gy1,gz1
@@ -193,7 +194,7 @@ if (iscalar==0) then
          call decomp_2d_write_var(fh,disp,1,pp3,phG)
          call MPI_FILE_CLOSE(fh,ierror)
       else
-         if (nrank==0) print *,'RESTART'
+         if (nrank==0) print *,'RESTART: reading sauve.dat ...'
          call MPI_FILE_OPEN(MPI_COMM_WORLD, 'sauve.dat', &
               MPI_MODE_RDONLY, MPI_INFO_NULL, &
               fh, ierror)
@@ -233,7 +234,7 @@ if (iscalar==0) then
          call decomp_2d_write_var(fh,disp,1,pp3,phG)
          call MPI_FILE_CLOSE(fh,ierror)
       else
-         if (nrank==0) print *,'RESTART'
+         if (nrank==0) print *,'RESTART: reading sauve.dat ...'
          call MPI_FILE_OPEN(MPI_COMM_WORLD, 'sauve.dat', &
               MPI_MODE_RDONLY, MPI_INFO_NULL, &
               fh, ierror)
@@ -277,7 +278,7 @@ if (nscheme.ne.4) then
          call decomp_2d_write_var(fh,disp,1,phis1)
          call MPI_FILE_CLOSE(fh,ierror)
       else
-         if (nrank==0) print *,'RESTART'
+         if (nrank==0) print *,'RESTART: reading sauve.dat ...'
          call MPI_FILE_OPEN(MPI_COMM_WORLD, 'sauve.dat', &
               MPI_MODE_RDONLY, MPI_INFO_NULL, &
               fh, ierror)
@@ -292,10 +293,10 @@ if (nscheme.ne.4) then
          call decomp_2d_read_var(fh,disp,1,py1)
          call decomp_2d_read_var(fh,disp,1,pz1)
          call decomp_2d_read_var(fh,disp,1,pp3,phG)
-         call decomp_2d_read_var(fh,disp,1,phi1)
-         call decomp_2d_read_var(fh,disp,1,phis1)
-         !phi1(:,:,:)=0.
-         !phis1(:,:,:)=0.
+         !call decomp_2d_read_var(fh,disp,1,phi1)
+         !call decomp_2d_read_var(fh,disp,1,phis1)
+         phi1(:,:,:)=0.
+         phis1(:,:,:)=0.
          call MPI_FILE_CLOSE(fh,ierror)
       endif
    else !SCALAR + AB3
@@ -324,7 +325,7 @@ if (nscheme.ne.4) then
          call decomp_2d_write_var(fh,disp,1,phiss1)
          call MPI_FILE_CLOSE(fh,ierror)
       else
-         if (nrank==0) print *,'RESTART'
+         if (nrank==0) print *,'RESTART: reading sauve.dat ...'
          call MPI_FILE_OPEN(MPI_COMM_WORLD, 'sauve.dat', &
               MPI_MODE_RDONLY, MPI_INFO_NULL, &
               fh, ierror)
@@ -351,6 +352,7 @@ if (nscheme.ne.4) then
 endif
 
 if (irestart==0) then
+   if (nrank==0) print *,'reconstructing pressure gradients...'
 ! reconstruction of the dp/dx, dp/dy and dp/dz from px1,py1 and pz1
 ! Temporal scheme (1:AB2, 2: RK3, 3:RK4, 4:AB3)
    if (nscheme==1) xdt=adt(1)+bdt(1)
@@ -424,19 +426,42 @@ if (irestart==0) then
 
    endif
 
-   if (nrank==0) print *,'reconstruction pressure gradients done!'
 endif
 
 if (irestart==0) then
 if (ivirt==2) then
+   if (nrank==0) print *,'Reading epsilon file done from restart...'
    call MPI_FILE_OPEN(MPI_COMM_WORLD, 'epsilon.dat', &
         MPI_MODE_RDONLY, MPI_INFO_NULL, &
         fh, ierror)
    disp = 0_MPI_OFFSET_KIND
    call decomp_2d_read_var(fh,disp,1,ep1) 
    call MPI_FILE_CLOSE(fh,ierror)
-   if (nrank==0) print *,'read epsilon file done from restart'
 endif
+endif
+
+injet_x=-2.
+injet_y=.false.
+if (itype==5 .and. v_jicf>0.) then
+  do k=1,xsize(3)
+  do i=1,xsize(1)
+    !check the hole
+    tempa=xjicf-(i+xstart(1)-1)
+    tempb=nz/2-(k+xstart(3)-1)
+    r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
+    if (r2 .le. rjicf) injet_x(i,k)=2.*v_jicf*(1.-r2/rjicf)
+  enddo
+  enddo
+
+  do k=1,ysize(3)
+  do i=1,ysize(1)
+  !check the hole
+    tempa=xjicf-(i+ystart(1)-1)
+    tempb=nz/2-(k+ystart(3)-1)
+    r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
+    if (r2 .le. rjicf) injet_y(i,k)=.true.
+  enddo
+  enddo
 endif
 
 return

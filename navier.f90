@@ -232,12 +232,12 @@ else
   !ibm_y_max=min((itime-0)/5000+91,97)
 endif
 
-if (itype.ne.5) then
-   call ecoule(ux,uy,uz)
-   call random_number(bxo)
-   call random_number(byo)
-   call random_number(bzo)
+call ecoule(ux,uy,uz)
+call random_number(bxo)
+call random_number(byo)
+call random_number(bzo)
 
+if (itype.ne.5) then
    if (iin.eq.1) then  
       do k=1,xsize(3)
       do j=1,xsize(2)
@@ -275,10 +275,6 @@ elseif (itype==5) then
          endif !(iscalar==1)
       endif !(iin.eq.1)
    else  !rezone==0, no recycling
-      call ecoule(ux,uy,uz)
-      call random_number(bxo)
-      call random_number(byo)
-      call random_number(bzo)
       if (iin.eq.1) then  
          do k=1,xsize(3)
          do j=1,xsize(2)
@@ -544,7 +540,7 @@ real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: ux1,uy1,uz1,phi1,ep1
 real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: gx1,gy1,gz1,phis1
 real(mytype),dimension(xsize(1),xsize(2),xsize(3)) :: hx1,hy1,hz1,phiss1
 
-real(mytype) :: y,r,um,r1,r2,r3
+real(mytype) :: y,r,um,r1,r2,r3,tempa,tempb
 integer :: k,j,i,fh,ierror,code,ii
 integer (kind=MPI_OFFSET_KIND) :: disp
 
@@ -633,6 +629,29 @@ if (ivirt==2) then
    print *,ep1
 endif
 
+injet_x=-2.
+injet_y=.false.
+if (itype==5 .and. v_jicf>0.) then
+  do k=1,xsize(3)
+  do i=1,xsize(1)
+    !check the hole
+    tempa=xjicf-(i+xstart(1)-1)
+    tempb=nz/2-(k+xstart(3)-1)
+    r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
+    if (r2 .le. rjicf) injet_x(i,k)=2.*v_jicf*(1.-r2/rjicf)
+  enddo
+  enddo
+
+  do k=1,ysize(3)
+  do i=1,ysize(1)
+  !check the hole
+    tempa=xjicf-(i+ystart(1)-1)
+    tempb=nz/2-(k+ystart(3)-1)
+    r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
+    if (r2 .le. rjicf) injet_y(i,k)=.true.
+  enddo
+  enddo
+endif
 
 return
 end subroutine init
@@ -974,38 +993,19 @@ real(mytype) :: r2
 
 if ((nrank==0) .and. (print_flag==1)) print *,"ibm_y_max",ibm_y_max
 
-!if (itime==ifirst) then
-if (.true.) then
-  ep1=0.
-  do k=xstart(3),xend(3)
-  do j=xstart(2),xend(2)
-  do i=xstart(1),xend(1)
-    tempa=xjicf-i
-    tempb=nz/2-k
-    r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
-  
-    if ((j .le. ibm_y_max) .and. (r2 > rjicf)) then
-      ux(i,j,k)=0.
-      uy(i,j,k)=0.
-      uz(i,j,k)=0.
-      ep1(i,j,k)=1.
-    endif
-  enddo
-  enddo
-  enddo
-else
-  do k=xstart(3),xend(3)
-  do j=xstart(2),xend(2)
-  do i=xstart(1),xend(1)
-    if (ep1(i,j,k)==1.) then
-      ux(i,j,k)=0.
-      uy(i,j,k)=0.
-      uz(i,j,k)=0.
-    endif
-  enddo
-  enddo
-  enddo
-endif
+ep1=0.
+do k=xstart(3),xend(3)
+do j=xstart(2),xend(2)
+do i=xstart(1),xend(1)
+  if ((j .le. ibm_y_max) .and. (injet_x(i,k)<-1)) then
+    ux(i,j,k)=0.
+    uy(i,j,k)=0.
+    uz(i,j,k)=0.
+    ep1(i,j,k)=1.
+  endif
+enddo
+enddo
+enddo
 
 !if (mod(itime,imodulo)==0) then
 !  uvisu=0.
@@ -1231,64 +1231,48 @@ if ((ncly==2) .and. (iimplicit==0))then
    ! determine the processor grid in use
    !call MPI_CART_GET(DECOMP_2D_COMM_CART_X, 2, &
    !      dims, dummy_periods, dummy_coords, code)
-  ujicf=0.
-  njicf=0.
-  temp=0.
+
 !********bottom wall*************************************
-  if (v_jicf==0.) then !nojet
-    if (xstart(2)==1) then
-      do k=1,xsize(3)
-      do i=1,xsize(1)
+     ujicf=0.
+     njicf=0.
+     temp=0.
+     njicf1=0.
+     ujicf1=0.
+     temp1=0.
+     if (xstart(2)==1) then
+       do k=1,xsize(3)
+       do i=1,xsize(1)
          ux(i,1,k)=0.+dpdxy1(i,k)
-         uy(i,1,k)=0.
+         if (injet_x(i,k)>-1) then
+           uy(i,1,k)=injet_x(i,k)
+           temp1=max(temp1,uy(i,1,k))
+           ujicf1=ujicf1+uy(i,1,k)*dx*dz
+           njicf1=njicf1+1
+         else
+           uy(i,1,k)=0.
+         endif
          uz(i,1,k)=0.+dpdzy1(i,k)
-      enddo
-      enddo
-    endif
-  else  !jet
-    njicf1=0.
-    ujicf1=0.
-    temp1=0.
-    if (xstart(2)==1) then
-      do k=1,xsize(3)
-      do i=1,xsize(1)
-	ux(i,1,k)=0.+dpdxy1(i,k)
-        !check the hole
-        tempa=xjicf-(i+xstart(1)-1)
-        tempb=nz/2-(k+xstart(3)-1)
-        r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
-        if (r2 .le. rjicf) then
-	  r2=2.*v_jicf*(1.-r2/rjicf)
-	  !uy(i,1,k)=min(r2,(itime-ifirst)*r2/10000)
-          uy(i,1,k)=r2
-          temp1=max(temp1,uy(i,1,k))
-          ujicf1=ujicf1+uy(i,1,k)*dx*dz
-          njicf1=njicf1+1
-        else
-          uy(i,1,k)=0.
-        endif
-        uz(i,1,k)=0.+dpdzy1(i,k)
-      enddo
-      enddo
-    endif
-    call MPI_ALLREDUCE(ujicf1,ujicf,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-    call MPI_ALLREDUCE(njicf1,njicf,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,code)
-    call MPI_REDUCE(temp1,temp,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
-    if ((nrank==0) .and. (print_flag==1)) print *,"njicf",njicf,"ujicf",ujicf,"max V",temp
-  endif  !  if (v_jicf==0) then
+       enddo
+       enddo
+     endif
+     call MPI_ALLREDUCE(ujicf1,ujicf,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
+     call MPI_ALLREDUCE(njicf1,njicf,1,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,code)
+     call MPI_REDUCE(temp1,temp,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,code)
+     if ((nrank==0) .and. (print_flag==1)) print *,"njicf",njicf,"ujicf",ujicf,"max V",temp
+
 !      print *,nrank,xstart(2),ny-(nym/p_row)
 
 !********top wall*************************************
-  if (xend(2)==ny) then
-    do k=1,xsize(3)
-    do i=1,xsize(1)
-      ux(i,xsize(2),k)=0.+dpdxyn(i,k)
-      uy(i,xsize(2),k)=0.
-      uz(i,xsize(2),k)=0.+dpdzyn(i,k)
-    enddo
-    enddo
-  endif
-endif  !itype == 5
+     if (xend(2)==ny) then
+       do k=1,xsize(3)
+       do i=1,xsize(1)
+         ux(i,xsize(2),k)=0.+dpdxyn(i,k)
+         uy(i,xsize(2),k)=0.
+         uz(i,xsize(2),k)=0.+dpdzyn(i,k)
+       enddo
+       enddo
+     endif
+   endif  !itype == 5
 endif  !NCLY==2
 
 !      print *,nrank,'dims1',dims(1),'dims2',dims(2)

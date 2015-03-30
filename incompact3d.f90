@@ -66,10 +66,6 @@ call init_variables
 !DEVELOPPEMENT A PLACER DANS incompact3d.prm
 !iimplicit=0
 !iimplicit=iscalar
-if (nrank.eq.0) then 
-  if (iimplicit.eq.0) print *,'Explicit/Semi-implicit Parametre: Explicit'
-  if (iimplicit.eq.1) print *,'Explicit/Semi-implicit Parametre: Semi-implicit'
-endif
 
 call schemes()
 
@@ -105,8 +101,8 @@ if (ilit==1) call restart(ux1,uy1,uz1,ep1,pp3,phi1,gx1,gy1,gz1,&
 
 call module_user_init(phG,ph1,ph2,ph3,ph4)
 
-!call test_speed_min_max(ux1,uy1,uz1)
-!if (iscalar==1) call test_scalar_min_max(phi1)
+call test_speed_min_max(ux1,uy1,uz1)
+if (iscalar==1) call test_scalar_min_max(phi1)
 
 !!array for stat to zero
 !umean=0.;vmean=0.;wmean=0.
@@ -215,10 +211,12 @@ do itime=ifirst,ilast
    if (mod(itime,isave)==0) then
       call restart(ux1,uy1,uz1,ep1,pp3,phi1,gx1,gy1,gz1,&
            px1,py1,pz1,phis1,hx1,hy1,hz1,phiss1,phG,1)
-      call module_user_post(phG,ph1,ph2,ph3,ph4)
+      if (itime.gt.beg_stat) call module_user_post(phG,ph1,ph2,ph3,ph4)
+      !call module_user_post(phG,ph1,ph2,ph3,ph4)
    endif
      
-   if (itime>beg_stat .and. mod(itime,imodulo)==0 .and. (itime-beg_stat)*dt<=xlx) then
+   !if (itime>beg_stat .and. mod(itime,imodulo)==0 .and. (itime-beg_stat)*dt<=xlx) then
+   if (mod(itime,imodulo)==0) then
       call VISU_INSTA(ux1,uy1,uz1,phi1,ta1,tb1,tc1,td1,te1,tf1,tg1,th1,ti1,di1,&
            ta2,tb2,tc2,td2,te2,tf2,tg2,th2,ti2,tj2,di2,&
            ta3,tb3,tc3,td3,te3,tf3,tg3,th3,ti3,di3,phG,uvisu)

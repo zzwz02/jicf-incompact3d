@@ -330,7 +330,7 @@ subroutine read_user_stats(phG,ph1,ph2,ph3,ph4)
   !
   ! Read average when using a restart
   !
-  use decomp_2d, only : DECOMP_INFO
+  use decomp_2d, only : DECOMP_INFO, nrank
   use decomp_2d_io, only : decomp_2d_read_one
   use param, only : iscalar
 
@@ -339,6 +339,8 @@ subroutine read_user_stats(phG,ph1,ph2,ph3,ph4)
   TYPE(DECOMP_INFO), intent(in) :: phG,ph1,ph2,ph3,ph4
 
   character(len=30) :: filename
+
+  if (nrank.eq.0) print*,'read_user_stats: reading average files...'
 
   filename='um.dat'
   call read_one_user_stat(filename,um)
@@ -413,13 +415,13 @@ subroutine read_one_user_stat(filename,var)
       end do
     end do
     !
-    if (nrank.eq.0) print*,'user_stats : reading average for file ',trim(filename),' done'
+    if (nrank.eq.0) print*,'   reading ',trim(filename),' done'
     !
   else
     !
     var = 0.
     !
-    if (nrank.eq.0) print*,'user_stats : average file ',trim(filename),' is not existing, initial value is set to 0'
+    if (nrank.eq.0) print*,'   ',trim(filename),' is not existing, initial value is set to 0'
     !
   endif
 
