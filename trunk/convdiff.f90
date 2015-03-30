@@ -386,7 +386,7 @@ enddo
 !!!!!!!!!!!!!!!!!!!!!!!!!!
 !!! Kasagi Source term !!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!
-!ta1=ta1-ux1*xnu
+!ta1=ta1+ux1*xnu
 
 !TIME ADVANCEMENT
 nxyz=xsize(1)*xsize(2)*xsize(3)  
@@ -448,32 +448,24 @@ endif
 if (ncly==2) then
 if (itype.eq.2) then
 !********bottom wall*************************************
-    if ((xstart(2)==1) .and. (beta_0==0.)) phi1(:,1,:)=0.
+    if (xstart(2)==1) phi1(:,1,:)=0.
 !********top wall*************************************
-    if ((xend(2)==ny) .and. (beta_n==0.)) phi1(:,xsize(2),:)=0.
+    if (xend(2)==ny) phi1(:,xsize(2),:)=0.
 else if (itype.eq.5) then
 !********bottom wall*************************************
-    if ((xstart(2)==1) .and. (beta_0==0.))  then
-      if (v_jicf==0.) then
-	phi1(:,1,:)=0.
+  if (xstart(2)==1) then
+    do k=1,xsize(3)
+    do i=1,xsize(1)
+      if (injet_x(i,k)>-1) then
+        phi1(i,1,k)=1.
       else
-	do k=1,xsize(3)
-	do i=1,xsize(1)
-	  !check the hole
-	  tempa=xjicf-(i+xstart(1)-1)
-	  tempb=nz/2-(k+xstart(3)-1)
-	  r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
-	  if (r2 .le. rjicf) then
-	    phi1(i,1,k)=1.
-	  else
-	    phi1(i,1,k)=0.
-	  endif
-	enddo
-	enddo
+        phi1(i,1,k)=0.
       endif
-    endif
+    enddo
+    enddo
+  endif
 !********top wall*************************************
-    if ((xend(2)==ny) .and. (beta_n==0.)) phi1(:,xsize(2),:)=0.
+  if (xend(2)==ny) phi1(:,xsize(2),:)=0.
 endif
 endif
 

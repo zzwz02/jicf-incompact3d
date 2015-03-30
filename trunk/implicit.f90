@@ -3027,6 +3027,7 @@ subroutine scalar_schemes(fpi2t)
    real(mytype), dimension(ny) :: rrmt10,qqmt10,vvmt10,ssmt10
    real(mytype), dimension(ny) :: aamt11,bbmt11,ccmt11,ddmt11,eemt11,ggmt11,hhmt11,wwmt11,zzmt11
    real(mytype), dimension(ny) :: rrmt11,qqmt11,vvmt11,ssmt11
+   real(mytype) :: c1,nu0snu,xmpi2,xnpi2
 
    xcst_pr=xnu*dt*0.5/sc
 
@@ -3044,6 +3045,31 @@ subroutine scalar_schemes(fpi2t)
    askzt  =((6.-9.*alsakzt)/4.)/dz2
    bskzt  =((-3.+24.*alsakzt)/5.)/(4.*dz2)
    cskzt  =((2.-11.*alsakzt)/20.)/(9.*dz2)
+   
+   !4th-order SVV
+   c1=exp(-((pi-2.*pi/3.)/(0.3*pi-2.*pi/3.))**2 )
+   nu0snu=8.
+   xmpi2=(c1*nu0snu+1.)*(4./9.)*pi*pi
+   xnpi2=(nu0snu+1.)*pi*pi
+   alsaixt = (64.*xmpi2-27.*xnpi2-96.)/(64.*xmpi2-54.*xnpi2+48.)
+   asixt = (54.*xnpi2-15.*xmpi2*xnpi2+12.)/(64.*xmpi2-54.*xnpi2+48.)
+   asixt = asixt / (dx2)
+   bsixt = (192.*xmpi2-216.*xnpi2+24.*xmpi2*xnpi2-48.) &
+           /(64.*xmpi2-54.*xnpi2+48.)
+   bsixt = bsixt / (4.*dx2)
+   csixt = 3.*(18.*xnpi2 -3.*xmpi2*xnpi2-36.) &
+           /(64.*xmpi2-54.*xnpi2+48.)
+   csixt = csixt / (9.*dx2)
+
+   alsajyt=alsaixt
+   asjyt=asixt
+   bsjyt=bsixt
+   csjyt=csixt
+
+   alsakzt=alsaixt
+   askzt=asixt
+   bskzt=bsixt
+   cskzt=bsixt
 
    if (nclx.eq.0) then
       sfxt(1)   =alsaixt

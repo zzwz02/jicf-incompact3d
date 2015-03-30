@@ -1,5 +1,5 @@
 #define my_mod_stats
-!#define my_mod_solide
+#define my_mod_solide
 
 ! #ifdef my_mod_solide
 ! #include "myconjht.f90"
@@ -36,7 +36,6 @@ subroutine module_user_init(phG,ph1,ph2,ph3,ph4)
   TYPE(DECOMP_INFO), intent(in) :: phG,ph1,ph2,ph3,ph4
 
   integer :: j
-!  real(mytype) :: xx, yy, zz
 
 bool_conjugate_ht=.false.
 #ifdef my_mod_stats
@@ -45,10 +44,10 @@ bool_conjugate_ht=.false.
 #ifdef my_mod_solide
   if (iscalar.eq.1) bool_conjugate_ht=.true.
   if (bool_conjugate_ht) then
-    ny_sol_bot=64
-    ly_sol_bot=1.
+    ny_sol_bot=48
+    ly_sol_bot=0.5
     repr_sol_bot=sc/xnu
-    fluxratio_bot=1.
+    fluxratio_bot=10.
     ny_sol_top=ny_sol_bot
     ly_sol_top=ly_sol_bot
     repr_sol_top=repr_sol_bot
@@ -59,7 +58,7 @@ bool_conjugate_ht=.false.
 
 #ifdef my_mod_stats
   if (bool_user_stat) then
-    beg_stat=10000000
+    beg_stat=0
     call allocate_user_stats(nx_global, ny_global, nz_global,phG,ph1,ph2,ph3,ph4)
     call read_user_stats(phG,ph1,ph2,ph3,ph4)
   endif
@@ -93,6 +92,7 @@ subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
 #ifdef my_mod_stats
   use user_stats, only : bool_user_stat, beg_stat, &
                          pre_update_user_stats, plot_my_stats
+  use param, only : print_flag
 #endif
 #ifdef my_mod_solide
   use conjugate_ht, only : bool_conjugate_ht, bool_sol_stats, &
@@ -109,7 +109,7 @@ subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
     if (itime.gt.beg_stat) then
       call pre_update_user_stats(phG,ph1,ph2,ph3,ph4)
     endif
-      call plot_my_stats()
+      if (print_flag==1) call plot_my_stats()
   endif
 #endif
 

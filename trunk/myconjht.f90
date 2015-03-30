@@ -4,6 +4,7 @@ module conjugate_ht
 !
 use decomp_2d, only : mytype, DECOMP_INFO
 use param, only : print_flag
+use variables, only : injet
 
 type(decomp_info), save :: mydecomp_bot, mydecomp_top
 logical, save :: bool_conjugate_ht, bool_sol_stats
@@ -17,7 +18,7 @@ real(mytype), save, allocatable, dimension(:) :: yp_bot, yp_top
 real(mytype), save, allocatable, dimension(:,:) :: val_bot, val_top
 real(mytype), save, allocatable, dimension(:,:) :: flux_bot, flux_top
 real(mytype), save, allocatable, dimension(:,:) :: d2pn_bot, d2pn_top
-real(mytype), save, allocatable, dimension(:,:) :: invdiffy_bot, invdiffy_top
+real(mytype), save, allocatable, dimension(:,:) :: invdiffy_bot, invdiffy_top, invdiffy_bot_jet
 real(mytype), save, allocatable, dimension(:,:,:) :: cl_bot, cl_top
 real(mytype), save, allocatable, dimension(:,:,:) :: temp_bot, temp_top
 real(mytype), save, allocatable, dimension(:,:,:) :: bot_dm1, top_dm1
@@ -49,15 +50,15 @@ subroutine conjugate_ht_init()
 !
 ! Subroutine to initialize the module
 !
-  use decomp_2d, only : ysize, nrank, ystart
+  use decomp_2d, only : ysize, nrank, ystart, real_type
   use param, only : yly, ilit, twopi, dz, dx, dt
-  use MPI,only : MPI_WTIME
+  use MPI
 
   implicit none
 
   ! Local variables
   integer :: i,j,k
-  real(mytype) :: ytmp,t1,t2
+  real(mytype) :: phimax,phimin,phimax1,phimin1,ytmp,t1,t2
   real(mytype) :: x, z, mysx, mysy, mysz
   real(mytype), dimension(ysize(1),ny_sol_bot+1+2,ysize(3)) :: ydiff_bot
   real(mytype), dimension(ysize(1),ny_sol_top+1+2,ysize(3)) :: ydiff_top
@@ -111,10 +112,14 @@ subroutine conjugate_ht_init()
   if (nrank.eq.0) print *,'    - Y-diffusion matrix computed',t2,' seconds'
   if (nrank.eq.0) print *,'    - Computing inverse of matrix'
   allocate(invdiffy_bot(ny_sol_bot-1,ny_sol_bot-1))
-  i = my_ydiff_mat_inv(d2pn_bot,ny_sol_bot,invdiffy_bot,flux_bot(1,:),flux_bot(2,:),repr_sol_bot)
+  allocate(invdiffy_bot_jet(ny_sol_bot-1,ny_sol_bot-1))
+  !i = my_ydiff_mat_inv(d2pn_bot,ny_sol_bot,invdiffy_bot,flux_bot(1,:),flux_bot(2,:),repr_sol_bot)
+  i = my_ydiff_mat_inv(d2pn_bot,ny_sol_bot,invdiffy_bot,val_bot(1,:)-flux_bot(1,:),flux_bot(2,:),repr_sol_bot)
+  i = my_ydiff_mat_inv(d2pn_bot,ny_sol_bot,invdiffy_bot_jet,val_bot(1,:),val_bot(2,:),repr_sol_bot)
   if (nrank.eq.0) print *,'      o Bottom matrix inverted : ', i
   allocate(invdiffy_top(ny_sol_top-1,ny_sol_top-1))
-  i = my_ydiff_mat_inv(d2pn_top,ny_sol_top,invdiffy_top,flux_top(1,:),flux_top(2,:),repr_sol_top)
+  !i = my_ydiff_mat_inv(d2pn_top,ny_sol_top,invdiffy_top,flux_top(1,:),flux_top(2,:),repr_sol_top)
+  i = my_ydiff_mat_inv(d2pn_top,ny_sol_top,invdiffy_top,flux_top(1,:),val_top(2,:)+flux_top(2,:),repr_sol_top)
   if (nrank.eq.0) print *,'      o Top matrix inverted : ', i
   !
   allocate(cl_bot(ysize(1),1,ysize(3)))
@@ -184,17 +189,11 @@ subroutine conjugate_ht_init()
 !    ! Diffusion non explicite
 !    bot_dm1=(bot_dm1+sol_imp_var*ydiff_bot)/repr_sol_bot
 !    top_dm1=(top_dm1+sol_imp_var*ydiff_top)/repr_sol_top
-temp_bot=0.
-temp_top=0.
-bot_dm1=0.
-top_dm1=0.
+    temp_bot=0.
+    temp_top=0.
+    bot_dm1=0.
+    top_dm1=0.
     if (nrank.eq.0) print *,'    - Solid temperature initialized'
-    ! Compute min/max & check convergence
-    if (nrank.eq.0) print *,'Solid bottom : '
-    call test_sol_min_max(temp_bot,yp_bot,ny_sol_bot,fluxratio_bot,repr_sol_bot)
-    if (nrank.eq.0) print *,'Solid top : '
-    call test_sol_min_max(temp_top,yp_top,ny_sol_top,fluxratio_top,repr_sol_top)
-    !
   else
     !
     call solide_restart(.false.)
@@ -202,6 +201,19 @@ top_dm1=0.
     if (nrank.eq.0) print *,'    - Solid temperature restart ok'
     !
   endif
+  ! Compute min/max & check convergence
+  phimax=maxval(temp_bot)
+  phimin=minval(temp_bot)
+  call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,i)
+  call MPI_REDUCE(phimin,phimin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,i)
+  if (print_flag==1 .and. nrank.eq.0) print *,'min/max Phi @ Bottom Solid : ',phimin1, phimax1
+  !call test_sol_min_max(temp_bot,yp_bot,ny_sol_bot,fluxratio_bot,repr_sol_bot)
+  phimax=maxval(temp_top)
+  phimin=minval(temp_top)
+  call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,i)
+  call MPI_REDUCE(phimin,phimin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,i)
+  if (print_flag==1 .and. nrank.eq.0) print *,'min/max Phi @ Top Solid    : ',phimin1, phimax1
+  !call test_sol_min_max(temp_top,yp_top,ny_sol_top,fluxratio_top,repr_sol_top)
   !
   if (nrank.eq.0) print *,'  Conjugate heat transfer initialized'
   !
@@ -386,16 +398,19 @@ subroutine update_temp_solide()
 ! Compute temperature in the solid
 ! with the boundary flux imposed from the fluid
 !
-  use decomp_2d, only : ysize, nrank
-  use param, only : dt, twopi, itime, ilit, t
-
+  use decomp_2d, only : ysize, nrank, real_type, ystart, yend, real_type, transpose_x_to_y, transpose_y_to_x
+  use param, only : dx, dx2, dz2, dt, twopi, itime, ilit, t, itype
+  use variables, only : nx, nz, rezone, xjicf, rjicf, v_jicf
+  use MPI
+  
   implicit none
 
   ! Local variables
-  integer :: i, j, k
-  real(mytype) :: a, b, c
+  integer :: i, j, k, tempa, tempb
+  real(mytype) :: phimax, phimin, phimax1, phimin1, a, b, c, r2
   real(mytype), dimension(ysize(1),ny_sol_bot+1+2,ysize(3)) :: ydiff_bot
   real(mytype), dimension(ysize(1),ny_sol_top+1+2,ysize(3)) :: ydiff_top
+  !real(mytype), dimension(mydeco%xsz(1),mydeco%xsz(2),mydeco%xsz(3)) :: temp1
 
   ! Switch from Euler1 to AB3
 !  if ((ilit.eq.0).and.(itime.eq.1)) then
@@ -426,23 +441,68 @@ subroutine update_temp_solide()
 
   ! Boundary coundition : flux imposed with fluid and temperature imposed with exterior
   ! Derivate in solid is derivate in fluid * fluxratio
-  ydiff_bot(:,1,:)=-1. !-fluxratio_bot
+  do k=1,ysize(3)
+  do i=1,ysize(1)
+    if (injet(i,k)) then
+      ydiff_bot(i,1,k)=1. !-fluxratio_bot
+    else
+      ydiff_bot(i,1,k)=0. !-fluxratio_bot
+    endif
+  enddo
+  enddo
+  !ydiff_bot(:,1,:)=0. !-fluxratio_bot
   ydiff_bot(:,ny_sol_bot+1+2,:)=cl_bot(:,1,:)*fluxratio_bot
   ydiff_top(:,1,:)=cl_top(:,1,:)*fluxratio_top
-  ydiff_top(:,ny_sol_top+1+2,:)=1. !fluxratio_top
+  ydiff_top(:,ny_sol_top+1+2,:)=0. !fluxratio_top
 
   ! Use matrix inversion to update temperature
   ! New temperature in temp_bot and temp_top
+  !call my_new_solid_temp(temp_bot,ydiff_bot,invdiffy_bot,&
+  !         d2pn_bot,val_bot,ny_sol_bot,flux_bot(1,:),flux_bot(2,:),repr_sol_bot)
+  !call my_new_solid_temp(temp_top,ydiff_top,invdiffy_top,&
+  !         d2pn_top,val_top,ny_sol_top,flux_top(1,:),flux_top(2,:),repr_sol_top)
   call my_new_solid_temp(temp_bot,ydiff_bot,invdiffy_bot,&
-           d2pn_bot,val_bot,ny_sol_bot,flux_bot(1,:),flux_bot(2,:),repr_sol_bot)
+           d2pn_bot,val_bot,ny_sol_bot,val_bot(1,:)-flux_bot(1,:),flux_bot(2,:),repr_sol_bot,1)
   call my_new_solid_temp(temp_top,ydiff_top,invdiffy_top,&
-           d2pn_top,val_top,ny_sol_top,flux_top(1,:),flux_top(2,:),repr_sol_top)
+           d2pn_top,val_top,ny_sol_top,flux_top(1,:),val_top(2,:)+flux_top(2,:),repr_sol_top,2)
 
-  ! Compute min/max & check convergence if required
-  if (print_flag==1 .and. nrank.eq.0) print *,'Solid bottom : '
-  call test_sol_min_max(temp_bot,yp_bot,ny_sol_bot,fluxratio_bot,repr_sol_bot)
-  if (print_flag==1 .and. nrank.eq.0) print *,'Solid top : '
-  call test_sol_min_max(temp_top,yp_top,ny_sol_top,fluxratio_top,repr_sol_top)
+  if (itype==5 .and. v_jicf>0) then
+    do k=1,ysize(3)
+    do i=1,ysize(1)
+      if (injet(i,k)) temp_bot(i,:,k)=1.
+    enddo
+    enddo
+    if (ystart(1)==1) then
+     temp_bot(1,:,:)=0.
+     temp_top(1,:,:)=0.
+    endif
+    do i=1,ysize(1)
+      if (i+ystart(1)-1<=rezone) then
+        temp_bot(i,:,:)=0.
+        temp_top(i,:,:)=0.
+      endif
+    enddo
+!     if (yend(1)==nx) then
+!       temp_bot(ysize(1),:,:)=(4*temp_bot(ysize(1)-1,:,:) &
+!                              -temp_bot(ysize(1)-2,:,:))/3
+!       temp_top(ysize(1),:,:)=(4*temp_top(ysize(1)-1,:,:) &
+!                              -temp_top(ysize(1)-2,:,:))/3
+!     endif
+  endif
+
+  ! Compute min/max & check convergence
+  phimax=maxval(temp_bot)
+  phimin=minval(temp_bot)
+  call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,i)
+  call MPI_REDUCE(phimin,phimin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,i)
+  if (print_flag==1 .and. nrank.eq.0) print *,'min/max Phi @ Bottom Solid : ',phimin1, phimax1
+  !call test_sol_min_max(temp_bot,yp_bot,ny_sol_bot,fluxratio_bot,repr_sol_bot)
+  phimax=maxval(temp_top)
+  phimin=minval(temp_top)
+  call MPI_REDUCE(phimax,phimax1,1,real_type,MPI_MAX,0,MPI_COMM_WORLD,i)
+  call MPI_REDUCE(phimin,phimin1,1,real_type,MPI_MIN,0,MPI_COMM_WORLD,i)
+  if (print_flag==1 .and. nrank.eq.0) print *,'min/max Phi @ Top Solid    : ',phimin1, phimax1
+  !call test_sol_min_max(temp_top,yp_top,ny_sol_top,fluxratio_top,repr_sol_top)
 
   ! Update history
   bot_dm3=bot_dm2
@@ -598,7 +658,7 @@ integer function my_ydiff_mat_inv(matin,n,matout,cl_b,cl_t,repr)
 
 end function my_ydiff_mat_inv
 
-subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr)
+subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr,bt)
 !
 ! Update temperature temp :
 ! temp = invdiffy * rhs
@@ -608,7 +668,7 @@ subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr)
 
   implicit none
 
-  integer, intent(in) :: n
+  integer, intent(in) :: n,bt
   real(mytype), intent(in) :: repr
   real(mytype), dimension(2,n+1), intent(in) :: val
   real(mytype), dimension(1,n+1), intent(in) :: cl_b, cl_t
@@ -619,82 +679,196 @@ subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr)
 
   ! Local variables
   integer :: i,j,k,l
-  real(mytype), dimension(2,2) :: math
-  real(mytype), dimension(2,n-1) :: matg
-  real(mytype), dimension(2,n+1) :: mycl
+  real(mytype), dimension(2,2) :: math,math_jet
+  real(mytype), dimension(2,n-1) :: matg,matg_jet
+  real(mytype), dimension(2,n+1) :: mycl,mycl_jet
 
-  temp=0.
+  if (bt==2) then !top
+      temp=0.
 
-  mycl(1,:)=cl_b(1,:)
-  mycl(2,:)=cl_t(1,:)
+      mycl(1,:)=cl_b(1,:)
+      mycl(2,:)=cl_t(1,:)
 
-  ! Compute math (inverse of a 2x2 matrix)
-  math(1,1)=mycl(2,n+1)
-  math(2,2)=mycl(1,1)
-  math(1,2)=-mycl(1,n+1)
-  math(2,1)=-mycl(2,1)
-  math=math/(mycl(1,1)*mycl(2,n+1)-mycl(1,n+1)*mycl(2,1))
-  ! Compute matg
-  matg=0.
-  do i=1,2
-  do j=1,n-1
-  do l=1,2
-    matg(i,j) = matg(i,j) - math(i,l)*mycl(l,j+1)
-  enddo
-  enddo
-  enddo
+      ! Compute math (inverse of a 2x2 matrix)
+      math(1,1)=mycl(2,n+1)
+      math(2,2)=mycl(1,1)
+      math(1,2)=-mycl(1,n+1)
+      math(2,1)=-mycl(2,1)
+      math=math/(mycl(1,1)*mycl(2,n+1)-mycl(1,n+1)*mycl(2,1))
+      ! Compute matg
+      matg=0.
+      do i=1,2
+      do j=1,n-1
+      do l=1,2
+        matg(i,j) = matg(i,j) - math(i,l)*mycl(l,j+1)
+      enddo
+      enddo
+      enddo
 
-  ! Compute temp inside (j=3:n+1)
-  do k=1,ysize(3)
-  do j=3,n+1
-  do i=1,ysize(1)
-    do l=1,n-1
-      temp(i,j,k) = temp(i,j,k) + invdiffy(j-2,l)*( rhs(i,l+2,k) &
-            + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,  1)* &
-                  ( math(1,1)*rhs(i,1,k)+math(1,2)*rhs(i,n+3,k) ) &
-            + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,n+1)* &
-                  ( math(2,1)*rhs(i,1,k)+math(2,2)*rhs(i,n+3,k) ) )
-    enddo
-  enddo
-  enddo
-  enddo
+      ! Compute temp inside (j=3:n+1)
+      do k=1,ysize(3)
+      do j=3,n+1
+      do i=1,ysize(1)
+        do l=1,n-1
+          temp(i,j,k) = temp(i,j,k) + invdiffy(j-2,l)*( rhs(i,l+2,k) &
+                + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,  1)* &
+                      ( math(1,1)*rhs(i,1,k)+math(1,2)*rhs(i,n+3,k) ) &
+                + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,n+1)* &
+                      ( math(2,1)*rhs(i,1,k)+math(2,2)*rhs(i,n+3,k) ) )
+        enddo
+      enddo
+      enddo
+      enddo
 
-  ! Compute temp at boundary chebyshev nodes
-  ! Using boundary condition
-  ! j=2 & j=n+2
-  !
-  ! Non-homogeneous boundary-condition from fluid
-  do k=1,ysize(3)
-  do i=1,ysize(1)
-    temp(i,2,k)   = math(1,1)*rhs(i,1,k) + math(1,2)*rhs(i,n+3,k)
-    temp(i,n+2,k) = math(2,1)*rhs(i,1,k) + math(2,2)*rhs(i,n+3,k)
-  enddo
-  enddo
-  !
-  ! Homogeneous boundary condition from solid
-  do k=1,ysize(3)
-  do i=1,ysize(1)
-    do j=1,n-1
-      temp(i,2,k)   = temp(i,2,k) &
-                    + matg(1,j)*temp(i,j+2,k)
-      temp(i,n+2,k) = temp(i,n+2,k) & 
-                    + matg(2,j)*temp(i,j+2,k)
-    enddo
-  enddo
-  enddo
+      ! Compute temp at boundary chebyshev nodes
+      ! Using boundary condition
+      ! j=2 & j=n+2
+      !
+      ! Non-homogeneous boundary-condition from fluid
+      do k=1,ysize(3)
+      do i=1,ysize(1)
+        temp(i,2,k)   = math(1,1)*rhs(i,1,k) + math(1,2)*rhs(i,n+3,k)
+        temp(i,n+2,k) = math(2,1)*rhs(i,1,k) + math(2,2)*rhs(i,n+3,k)
+      enddo
+      enddo
+      !
+      ! Homogeneous boundary condition from solid
+      do k=1,ysize(3)
+      do i=1,ysize(1)
+        do j=1,n-1
+          temp(i,2,k)   = temp(i,2,k) &
+                        + matg(1,j)*temp(i,j+2,k)
+          temp(i,n+2,k) = temp(i,n+2,k) & 
+                        + matg(2,j)*temp(i,j+2,k)
+        enddo
+      enddo
+      enddo
+      ! Compute temp at boundary nodes
+      ! Using chebyshev coefficients
+      do k=1,ysize(3)
+      do j=2,n+2
+      do i=1,ysize(1)
+        temp(i,1,k)   = temp(i,1,k) &
+                      + temp(i,j,k)*val(1,j-1)
+        temp(i,n+3,k) = temp(i,n+3,k) &
+                      + temp(i,j,k)*val(2,j-1)
+      enddo
+      enddo
+      enddo
+  else if (bt==1) then!bottom
+      temp=0.
 
-  ! Compute temp at boundary nodes
-  ! Using chebyshev coefficients
-  do k=1,ysize(3)
-  do j=2,n+2
-  do i=1,ysize(1)
-    temp(i,1,k)   = temp(i,1,k) &
-                  + temp(i,j,k)*val(1,j-1)
-    temp(i,n+3,k) = temp(i,n+3,k) &
-                  + temp(i,j,k)*val(2,j-1)
-  enddo
-  enddo
-  enddo
+      mycl(1,:)=cl_b(1,:)
+      mycl(2,:)=cl_t(1,:)
+
+      ! Compute math (inverse of a 2x2 matrix)
+      math(1,1)=mycl(2,n+1)
+      math(2,2)=mycl(1,1)
+      math(1,2)=-mycl(1,n+1)
+      math(2,1)=-mycl(2,1)
+      math=math/(mycl(1,1)*mycl(2,n+1)-mycl(1,n+1)*mycl(2,1))
+      ! Compute matg
+      matg=0.
+      do i=1,2
+      do j=1,n-1
+      do l=1,2
+        matg(i,j) = matg(i,j) - math(i,l)*mycl(l,j+1)
+      enddo
+      enddo
+      enddo
+
+      mycl_jet(1,:)=val_bot(1,:)
+      mycl_jet(2,:)=val_top(1,:)
+
+      ! Compute math (inverse of a 2x2 matrix)
+      math_jet(1,1)=mycl_jet(2,n+1)
+      math_jet(2,2)=mycl_jet(1,1)
+      math_jet(1,2)=-mycl_jet(1,n+1)
+      math_jet(2,1)=-mycl_jet(2,1)
+      math_jet=math_jet/(mycl_jet(1,1)*mycl_jet(2,n+1)-mycl_jet(1,n+1)*mycl_jet(2,1))
+      ! Compute matg
+      matg_jet=0.
+      do i=1,2
+      do j=1,n-1
+      do l=1,2
+        matg_jet(i,j) = matg_jet(i,j) - math_jet(i,l)*mycl_jet(l,j+1)
+      enddo
+      enddo
+      enddo
+
+      ! Compute temp inside (j=3:n+1)
+      do k=1,ysize(3)
+      do j=3,n+1
+      do i=1,ysize(1)
+        do l=1,n-1
+          if (injet(i,k)) then
+            temp(i,j,k) = temp(i,j,k) + invdiffy_bot_jet(j-2,l)*( rhs(i,l+2,k) &
+                  + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,  1)* &
+                        ( math_jet(1,1)*rhs(i,1,k)+math_jet(1,2)*rhs(i,n+3,k) ) &
+                  + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,n+1)* &
+                        ( math_jet(2,1)*rhs(i,1,k)+math_jet(2,2)*rhs(i,n+3,k) ) )
+          else
+            temp(i,j,k) = temp(i,j,k) + invdiffy(j-2,l)*( rhs(i,l+2,k) &
+                  + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,  1)* &
+                        ( math(1,1)*rhs(i,1,k)+math(1,2)*rhs(i,n+3,k) ) &
+                  + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,n+1)* &
+                        ( math(2,1)*rhs(i,1,k)+math(2,2)*rhs(i,n+3,k) ) )
+          endif
+        enddo
+      enddo
+      enddo
+      enddo
+
+      ! Compute temp at boundary chebyshev nodes
+      ! Using boundary condition
+      ! j=2 & j=n+2
+      !
+      ! Non-homogeneous boundary-condition from fluid
+      do k=1,ysize(3)
+      do i=1,ysize(1)
+        if (injet(i,k)) then
+          temp(i,2,k)   = math_jet(1,1)*rhs(i,1,k) + math_jet(1,2)*rhs(i,n+3,k)
+          temp(i,n+2,k) = math_jet(2,1)*rhs(i,1,k) + math_jet(2,2)*rhs(i,n+3,k)
+        else
+          temp(i,2,k)   = math(1,1)*rhs(i,1,k) + math(1,2)*rhs(i,n+3,k)
+          temp(i,n+2,k) = math(2,1)*rhs(i,1,k) + math(2,2)*rhs(i,n+3,k)
+        endif
+      enddo
+      enddo
+      !
+      ! Homogeneous boundary condition from solid
+      do k=1,ysize(3)
+      do i=1,ysize(1)
+        do j=1,n-1
+          if (injet(i,k)) then
+            temp(i,2,k)   = temp(i,2,k) &
+                          + matg_jet(1,j)*temp(i,j+2,k)
+            temp(i,n+2,k) = temp(i,n+2,k) &
+                          + matg_jet(2,j)*temp(i,j+2,k)
+          else
+            temp(i,2,k)   = temp(i,2,k) &
+                          + matg(1,j)*temp(i,j+2,k)
+            temp(i,n+2,k) = temp(i,n+2,k) &
+                          + matg(2,j)*temp(i,j+2,k)
+          endif
+        enddo
+      enddo
+      enddo
+
+      ! Compute temp at boundary nodes
+      ! Using chebyshev coefficients
+      do k=1,ysize(3)
+      do j=2,n+2
+      do i=1,ysize(1)
+        temp(i,1,k)   = temp(i,1,k) &
+                      + temp(i,j,k)*val(1,j-1)
+        temp(i,n+3,k) = temp(i,n+3,k) &
+                      + temp(i,j,k)*val(2,j-1)
+      enddo
+      enddo
+      enddo
+  endif
+
 
 end subroutine my_new_solid_temp
 
@@ -708,8 +882,10 @@ subroutine xzdiff_temp_solide(temp,dm1,n,mydeco)
                         alloc_x, alloc_y, alloc_z, &
                         transpose_x_to_y, transpose_y_to_x, &
                         transpose_z_to_y, transpose_y_to_z
-  use param, only : dx2, dz2, itime, ifirst, pi
+  use param, only : dx2, dz2, itime, ifirst, pi, nclx
   use variables, only : nx, nz
+  use derivX
+  use derivZ
 
   implicit none
 
@@ -729,6 +905,7 @@ subroutine xzdiff_temp_solide(temp,dm1,n,mydeco)
   real(mytype), dimension(mydeco%zsz(1),mydeco%zsz(2),mydeco%zsz(3)) :: di3
   real(mytype), dimension(mydeco%xsz(2),mydeco%xsz(3)) :: sx
   real(mytype), dimension(mydeco%zsz(1),mydeco%zsz(2)) :: sz
+  real(mytype) :: c1,nu0snu,xmpi2,xnpi2
 !  real(mytype), allocatable, dimension(:,:,:) :: dtdxx, dtdzz, dtdxyz
 !  real(mytype), allocatable, dimension(:,:,:) :: temp1, temp3
 !  real(mytype), allocatable, dimension(:,:,:) :: di1,di3
@@ -762,7 +939,28 @@ subroutine xzdiff_temp_solide(temp,dm1,n,mydeco)
     askzts  =((6.-9.*alsakzts)/4.)/dz2
     bskzts  =((-3.+24.*alsakzts)/5.)/(4.*dz2)
     cskzts  =((2.-11.*alsakzts)/20.)/(9.*dz2)
+    
+    !4th-order SVV
+    c1=exp(-((pi-2.*pi/3.)/(0.3*pi-2.*pi/3.))**2 )
+    nu0snu=2.
+    xmpi2=(c1*nu0snu+1.)*(4./9.)*pi*pi
+    xnpi2=(nu0snu+1.)*pi*pi
+    alsaixts = (64.*xmpi2-27.*xnpi2-96.)/(64.*xmpi2-54.*xnpi2+48.)
+    asixts = (54.*xnpi2-15.*xmpi2*xnpi2+12.)/(64.*xmpi2-54.*xnpi2+48.)
+    asixts = asixts / (dx2)
+    bsixts = (192.*xmpi2-216.*xnpi2+24.*xmpi2*xnpi2-48.) &
+             /(64.*xmpi2-54.*xnpi2+48.)
+    bsixts = bsixts / (4.*dx2)
+    csixts = 3.*(18.*xnpi2 -3.*xmpi2*xnpi2-36.) &
+             /(64.*xmpi2-54.*xnpi2+48.)
+    csixts = csixts / (9.*dx2)
 
+    alsakzts=alsaixts
+    askzts=asixts
+    bskzts=bsixts
+    cskzts=bsixts
+   
+    if (nclx.eq.0) then
     ! nclx=0 only implemented
     sfxts(1)   =alsaixts
     sfxts(2)   =alsaixts
@@ -784,7 +982,37 @@ subroutine xzdiff_temp_solide(temp,dm1,n,mydeco)
        scxts(i)=1.
        sbxts(i)=alsaixts
     enddo
+    endif
 
+   if (nclx.eq.2) then
+      sfxts(1)   =alsa1x
+      sfxts(2)   =alsa2x
+      sfxts(3)   =alsa3x
+      sfxts(nx-3)=alsaixts
+      sfxts(nx-2)=alsatx
+      sfxts(nx-1)=alsamx
+      sfxts(nx)  =0.
+      scxts(1)   =1.
+      scxts(2)   =1.
+      scxts(3)   =1.
+      scxts(nx-3)=1.
+      scxts(nx-2)=1.
+      scxts(nx-1)=1.
+      scxts(nx  )=1.
+      sbxts(1)   =alsa2x 
+      sbxts(2)   =alsa3x
+      sbxts(3)   =alsaixts
+      sbxts(nx-3)=alsatx
+      sbxts(nx-2)=alsamx
+      sbxts(nx-1)=alsanx
+      sbxts(nx  )=0.
+      do i=4,nx-4
+         sfxts(i)=alsaixts
+         scxts(i)=1.
+         sbxts(i)=alsaixts
+      enddo
+   endif
+    
     ! nclz=0 only implemented
     sfzts(1)   =alsakzts
     sfzts(2)   =alsakzts
@@ -816,6 +1044,7 @@ subroutine xzdiff_temp_solide(temp,dm1,n,mydeco)
 !    call alloc_x(temp1,mydeco)
 !    call alloc_z(temp3,mydeco)
     ! transpose y to x & y to z
+
     call transpose_y_to_x(temp,temp1,mydeco)
     call transpose_y_to_z(temp,temp3,mydeco)
 
@@ -1100,6 +1329,9 @@ end subroutine my2decomp_solide
 
 subroutine derxxts(tx,ux,rx,sx,sfx,ssx,swx,nx,ny,nz,npaire) 
 
+use derivX
+use param, only : nclx
+
 implicit none
 
 integer :: nx,ny,nz,npaire,i,j,k 
@@ -1107,6 +1339,7 @@ real(mytype), dimension(nx,ny,nz) :: tx,ux,rx
 real(mytype), dimension(ny,nz) :: sx
 real(mytype),  dimension(nx):: sfx,ssx,swx 
 
+  if (nclx==0) then
    do k=1,nz
    do j=1,ny
       tx(1,j,k)=asixts*(ux(2,j,k)-ux(1   ,j,k)&
@@ -1177,6 +1410,45 @@ real(mytype),  dimension(nx):: sfx,ssx,swx
       enddo
    enddo
    enddo
+ endif
+ 
+ if (nclx==2) then
+   do k=1,nz
+   do j=1,ny
+      tx(1,j,k)=as1x*ux(1,j,k)+bs1x*ux(2,j,k)&
+           +cs1x*ux(3,j,k)+ds1x*ux(4,j,k)
+      tx(2,j,k)=as2x*(ux(3,j,k)-ux(2,j,k)&
+           -ux(2,j,k)+ux(1,j,k))
+      tx(3,j,k)=as3x*(ux(4,j,k)-ux(3,j,k)&
+           -ux(3,j,k)+ux(2,j,k))&
+           +bs3x*(ux(5,j,k)-ux(3,j,k)&
+           -ux(3,j,k)+ux(1,j,k))
+      do i=4,nx-3
+         tx(i,j,k)=asixts*(ux(i+1,j,k)-ux(i  ,j,k)&
+              -ux(i  ,j,k)+ux(i-1,j,k))&
+              +bsixts*(ux(i+2,j,k)-ux(i  ,j,k)&
+              -ux(i  ,j,k)+ux(i-2,j,k))&
+              +csixts*(ux(i+3,j,k)-ux(i  ,j,k)&
+              -ux(i  ,j,k)+ux(i-3,j,k))
+      enddo
+      tx(nx-2,j,k)=astx*(ux(nx-1,j,k)-ux(nx-2,j,k)&
+           -ux(nx-2,j,k)+ux(nx-3,j,k))&
+           +bstx*(ux(nx  ,j,k)-ux(nx-2,j,k)&
+           -ux(nx-2,j,k)+ux(nx-4,j,k))
+      tx(nx-1,j,k)=asmx*(ux(nx  ,j,k)-ux(nx-1,j,k)&
+           -ux(nx-1,j,k)+ux(nx-2,j,k))
+      tx(nx  ,j,k)=asnx*ux(nx  ,j,k)+bsnx*ux(nx-1,j,k)&
+           +csnx*ux(nx-2,j,k)+dsnx*ux(nx-3,j,k)
+      do i=2,nx
+         tx(i,j,k)=tx(i,j,k)-tx(i-1,j,k)*ssx(i)
+      enddo
+      tx(nx,j,k)=tx(nx,j,k)*swx(nx)
+      do i=nx-1,1,-1
+         tx(i,j,k)=(tx(i,j,k)-sfx(i)*tx(i+1,j,k))*swx(i)
+      enddo
+   enddo
+   enddo
+endif
 
 return  
 

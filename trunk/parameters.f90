@@ -120,54 +120,57 @@ print *,'==========================================================='
 print *,''
 print *,''
 print *,''
-if (itype.eq.1) print *,'Constant flow field'
-if (itype.eq.2) print *,'Channel flow'
-if (itype.eq.3) print *,'Wake flow'
-if (itype.eq.4) print *,'Mixing layer with splitter plate'
-if (itype.eq.5) print *,'Jet in Cross Flow'
-if (itype.eq.6) print *,'Taylor Green vortices'
-if (itype.eq.7) print *,'Cavity flow'
-if (itype.eq.8) print *,'Flat plate Boundary layer'
-if (itype.eq.9) print *,'Water tank'
+print *,'Reading parameters: incompact3d.prm ...'
+if (itype.eq.1) print *,'   Constant flow field'
+if (itype.eq.2) print *,'   Channel flow'
+if (itype.eq.3) print *,'   Wake flow'
+if (itype.eq.4) print *,'   Mixing layer with splitter plate'
+if (itype.eq.5) print *,'   Jet in Cross Flow'
+if (itype.eq.6) print *,'   Taylor Green vortices'
+if (itype.eq.7) print *,'   Cavity flow'
+if (itype.eq.8) print *,'   Flat plate Boundary layer'
+if (itype.eq.9) print *,'   Water tank'
 write(*,1101) nx,ny,nz
-write(*,1103) xlx,yly,zlz 
-write(*,1102) nclx,ncly,nclz 
+write(*,1102) xlx,yly,zlz
+write(*,1103) nclx,ncly,nclz
 write(*,1104) u1,u2 
 write(*,1105) re
 write(*,1106) dt
-if (nscheme.eq.1) print *,'Temporal scheme   : Adams-bashforth 2'
-if (nscheme.eq.2) print *,'Temporal scheme   : Runge-Kutta 3'
-if (nscheme.eq.3) print *,'Temporal scheme   : Runge-Kutta 4'
-if (nscheme.eq.4) print *,'Temporal scheme   : Adams-bashforth 3'
-if (iscalar.eq.0) print *,'Passive scalar    : off'
+if (nscheme.eq.1) print *,'   Temporal scheme   : Adams-bashforth 2'
+if (nscheme.eq.2) print *,'   Temporal scheme   : Runge-Kutta 3'
+if (nscheme.eq.3) print *,'   Temporal scheme   : Runge-Kutta 4'
+if (nscheme.eq.4) print *,'   Temporal scheme   : Adams-bashforth 3'
+if (iscalar.eq.0) print *,'   Passive scalar    : off'
 if (iscalar.eq.1) then
-   print *,'Passive scalar : on'
+   print *,'   Passive scalar    : on'
    write (*,1113) sc
 endif
 if (ivirt.eq.0) then
-   print *,'Immersed boundary : off'
-   print *,'ibm_y_max = 1'
+   print *,'   Immersed boundary : off'
+   print *,'   ibm_y_max = 1'
    ibm_y_max=1
 endif
 if (ivirt.eq.1) then
-   print *,'Immersed boundary : on old school'
+   print *,'   Immersed boundary : on old school'
 !   write(*,1107) cex,cey,cez
 !   write(*,1110) ra
 endif
 if (ivirt.eq.2) then
-   print *,'Immersed boundary : on with Lagrangian Poly'
+   print *,'   Immersed boundary : on with Lagrangian Poly'
 endif
+if (iimplicit.eq.0) print *,'   Explicit/Semi-implicit Parametre: Explicit'
+if (iimplicit.eq.1) print *,'   Explicit/Semi-implicit Parametre: Semi-implicit'
 
-
- 1101 format(' Spatial Resolution: (nx,ny,nz)=(',I4,',',I4,',',I4,')')
- 1102 format(' Boundary condition: (nclx,ncly,nclz)=(',I1,',',I1,',',I1,')')
- 1103 format(' Domain dimension  : (lx,ly,lz)=(',F6.1,',',F6.1,',',F6.1,')')
- 1104 format(' High and low speed: u1=',F6.2,' and u2=',F6.2)
- 1105 format(' Reynolds number Re: ',F15.8)
- 1106 format(' Time step dt      : ',F15.8)
- 1107 format(' Object centred at : (',F6.2,',',F6.2,',',F6.2,')')
- 1110 format(' Object length     : ',F6.2)
- 1113 format(' Schmidt number    : ',F6.2)
+ 1101 format('    Spatial Resolution: (nx,ny,nz)=(',I4,',',I4,',',I4,')')
+ 1102 format('    Domain dimension  : (lx,ly,lz)=(',F6.1,',',F6.1,',',F6.1,')')
+ 1103 format('    Boundary condition: (nclx,ncly,nclz)=(',I1,',',I1,',',I1,')')
+ 1104 format('    High and low speed: u1=',F6.2,' and u2=',F6.2)
+ 1105 format('    Reynolds number Re: ',F15.8)
+ 1106 format('    Time step dt      : ',F15.8)
+ 1107 format('    Object centred at : (',F6.2,',',F6.2,',',F6.2,')')
+ 1110 format('    Object length     : ',F6.2)
+ 1113 format('    Schmidt number    : ',F6.2)
+print *,'Done!'
 endif
 xnu=1./re 
    
@@ -192,12 +195,13 @@ else
    call stretching()
 endif
 
+if (nrank==0) print *,'Generateing yp.dat ...'
 open(10,file='yp.dat',status='unknown',form='formatted')
 do j=1,ny
    write(10,*) j,yp(j),ypi(j)
 enddo
 close(10)
-
+if (nrank==0) print *,'Done!'
 !******************************************************************
 !
 !**TIME ADVANCE***1=AB2***2=RK3***3=RK4C&K****************** 

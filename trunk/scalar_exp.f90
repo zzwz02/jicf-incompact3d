@@ -1,4 +1,4 @@
-!#define my_mod_solide
+#define my_mod_solide
 
 !************************************************************
 !
@@ -10,6 +10,9 @@ subroutine scalar_exp(ux1,uy1,uz1,phi1,phis1,phiss1,di1,ta1,tb1,tc1,td1,&
 USE param
 USE variables
 USE decomp_2d
+#ifdef my_mod_solide
+use conjugate_ht, only : temp_bot,temp_top,ny_sol_bot,ny_sol_top,cl_bot,cl_top,update_temp_solide
+#endif
 
 implicit none
 
@@ -21,7 +24,10 @@ real(mytype),dimension(ysize(1),2*ysize(2),ysize(3)) :: tt2
 
 integer :: ijk,nvect1,nvect2,nvect3,i,j,k,l,nxyz,tempa,tempb
 real(mytype) :: x,y,z,r2
-logical,dimension(ysize(1),ysize(3)) :: injet
+
+#ifdef my_mod_solide
+real(mytype),dimension(ysize(1),2,ysize(3)) :: mytmptemp
+#endif
 
 nvect1=xsize(1)*xsize(2)*xsize(3)
 nvect2=ysize(1)*ysize(2)*ysize(3)
@@ -40,8 +46,9 @@ nvect3=zsize(1)*zsize(2)*zsize(3)
 100 do ijk=1,nvect1
    ta1(ijk,1,1)=ux1(ijk,1,1)*phi1(ijk,1,1)
 enddo
-call derx (tb1,ta1,di1,sx,ffx,fsx,fwx,xsize(1),xsize(2),xsize(3),0)
+call derx (tb1,ta1,di1,sx,ffxp,fsxp,fwxp,xsize(1),xsize(2),xsize(3),0)
 call derxx (ta1,phi1,di1,sx,sfxp,ssxp,swxp,xsize(1),xsize(2),xsize(3),1)
+!call derxxt (ta1,phi1,di1,sx,sfxpt,ssxpt,swxpt,xsize(1),xsize(2),xsize(3),1)
 
 !call transpose_x_to_y(tb1,temp1)
 !call transpose_x_to_y(ta1,temp2)
@@ -59,11 +66,12 @@ call transpose_x_to_y(uz1,uz2)
 do ijk=1,nvect2
   ta2(ijk,1,1)=uy2(ijk,1,1)*phi2(ijk,1,1)
 enddo
-call dery (tb2,ta2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)
+call dery (tb2,ta2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),0)
 
 if (istret.ne.0) then 
   call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1)
-  call dery (tc2,phi2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0)
+  !call deryyt (ta2,phi2,di2,sy,sfypt,ssypt,swypt,ysize(1),ysize(2),ysize(3),1)
+  call dery (tc2,phi2,di2,sy,ffyp,fsyp,fwyp,ppy,ysize(1),ysize(2),ysize(3),0)
   do k=1,ysize(3)
   do j=1,ysize(2)
   do i=1,ysize(1)
@@ -72,7 +80,8 @@ if (istret.ne.0) then
   enddo
   enddo
 else
-  call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1) 
+  call deryy (ta2,phi2,di2,sy,sfyp,ssyp,swyp,ysize(1),ysize(2),ysize(3),1)
+  !call deryyt (ta2,phi2,di2,sy,sfypt,ssypt,swypt,ysize(1),ysize(2),ysize(3),1)
 endif
 
 !if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
@@ -87,8 +96,9 @@ call transpose_y_to_z(uz2,uz3)
 do ijk=1,nvect3
    ta3(ijk,1,1)=uz3(ijk,1,1)*phi3(ijk,1,1)
 enddo
-call derz (tb3,ta3,di3,sz,ffz,fsz,fwz,zsize(1),zsize(2),zsize(3),0)
+call derz (tb3,ta3,di3,sz,ffzp,fszp,fwzp,zsize(1),zsize(2),zsize(3),0)
 call derzz (ta3,phi3,di3,sz,sfzp,sszp,swzp,zsize(1),zsize(2),zsize(3),1)
+!call derzzt (ta3,phi3,di3,sz,sfzpt,sszpt,swzpt,zsize(1),zsize(2),zsize(3),1)
 
 call transpose_z_to_y(ta3,tc2)
 call transpose_z_to_y(tb3,td2)
@@ -113,21 +123,21 @@ do ijk=1,nvect1
    tb1(ijk,1,1)=tb1(ijk,1,1)+td1(ijk,1,1) !FIRST DERIVATIVE
 enddo
 
-! call transpose_x_to_y(tb1,temp1)
-! call transpose_x_to_y(ta1,temp2)
-! if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
-!   print *,'FIRST DERIVATIVE',temp1(1,:,1)
-!   print *,'SECOND DERIVATIVE',temp2(1,:,1)
-! endif
+!call transpose_x_to_y(tb1,temp1)
+!call transpose_x_to_y(ta1,temp2)
+!if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
+!  print *,'FIRST DERIVATIVE',temp1(1,:,1)
+!  print *,'SECOND DERIVATIVE',temp2(1,:,1)
+!endif
 
 do ijk=1,nvect1
-   ta1(ijk,1,1)=xnu/sc*ta1(ijk,1,1)-tb1(ijk,1,1)-xnu/sc*ux1(ijk,1,1)
+   ta1(ijk,1,1)=xnu/sc*ta1(ijk,1,1)-tb1(ijk,1,1)
 enddo
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!
 !!! Kasagi Source term !!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!
-!ta1=ta1-xnu/sc*ux1
+!ta1=ta1+ux1*xnu/sc
 
 do ijk=1,nvect1
    ta1(ijk,1,1)=(1.-epsi(ijk,1,1))*ta1(ijk,1,1)
@@ -191,67 +201,81 @@ if (nscheme==4) then
 endif
 
 call transpose_x_to_y(phi1,phi2)
-tt2=0.
-injet=.false.
 
 if (ncly==2) then
-if (itype.eq.2) then
-!********bottom wall*************************************
-  phi2(:,1,:)=g_0
-!********top wall*************************************
-  phi2(:,ny,:)=g_n
-else if (itype.eq.5) then
-!********bottom wall*************************************
-  if (v_jicf==0.) then
-    phi2(:,1,:)=0. !g_0
-  else
-    do k=1,ysize(3)
-    do i=1,ysize(1)
-      !check the hole
-      tempa=xjicf-(i+ystart(1)-1)
-      tempb=nz/2-(k+ystart(3)-1)
-      r2=dx2*real(tempa*tempa)+dz2*real(tempb*tempb)
-      if (r2 .le. rjicf) then
-        phi2(i,1,k)=1.
-        injet(i,k)=.true.
-      else
-        phi2(i,1,k)=0. !g_0
-      endif
-    enddo
-    enddo
-  endif
-!********top wall*************************************
-  phi2(:,ny,:)=0. !g_n
-endif
-endif
+#ifdef my_mod_solide
+!! in conjugated heat transfer, b.c. of fluid is Dirichlet type,
+!! so no need to use scalar_left matrix
+  mytmptemp(:,1,:)=phi2(:,1,:)
+  mytmptemp(:,2,:)=phi2(:,ysize(2),:)
+  do k=1,ysize(3)
+  do i=1,ysize(1)
+    if (injet(i,k)) then
+      phi2(i,1,k)=1.
+    else
+      phi2(i,1,k)=0.5*(mytmptemp(i,1,k)+temp_bot(i,ny_sol_bot+3,k))
+    endif
+    phi2(:,ny,:) = 0.5*(mytmptemp(:,2,:)+temp_top(:,1,:))
+  enddo
+  enddo
 
-do k=1,ysize(3)
-do l=1,ny
-do j=1,ny+ny
-do i=1,ysize(1)
-  if (injet(i,k)) then
-    tt2(i,j,k)=tt2(i,j,k)+scalar_left_jet(j,l)*phi2(i,l,k)
-  else
-    tt2(i,j,k)=tt2(i,j,k)+scalar_left_main(j,l)*phi2(i,l,k)
-  endif
-enddo
-enddo
-enddo
-enddo
+  call dery (tc2,phi2,di2,sy,ffy,fsy,fwy,ppy,ysize(1),ysize(2),ysize(3),0) ! npaire=0
+  cl_bot(:,1,:)=tc2(:,1       ,:)
+  cl_top(:,1,:)=tc2(:,ysize(2),:)
+!if (itime.le.10 .and. nrank==0) then
+!  print *,'cl_bot',cl_bot(1,1,:)
+!  print *,'cl_top',cl_top(1,1,:)
+!endif
+!  cl_bot(:,1,:)=0.5*(tc2(:,1,:)-tc2(:,ysize(2),:))
+!  cl_top(:,1,:)=-cl_bot(:,1,:)
+!   if (itime.le.50000) then
+!     cl_bot(:,1,:)=(itime-1)*cl_bot(:,1,:)/50000.-1.*(50001-itime)/50000.
+!     cl_top(:,1,:)=(itime-1)*cl_top(:,1,:)/50000.+1.*(50001-itime)/50000.
+!   endif
+  call update_temp_solide()
+#else
+!! without conjugated heat transfer, b.c. of fluid may be Dirichlet/Neumann type,
+!! so it needs to use scalar_left matrix
+  tt2=0.
 
-do k=1,ysize(3)
-do j=1,ysize(2)
-do i=1,ysize(1)
+  do k=1,ysize(3)
+  do i=1,ysize(1)
+    if (injet_y(i,k)) then
+      phi2(i,1,k)=1.
+    else
+      phi2(i,1,k)=0.  !g_0
+    endif
+    phi2(i,ny,k) =0.  !g_n
+  enddo
+  enddo
+
+  do k=1,ysize(3)
+  do l=1,ny
+  do j=1,ny+ny
+  do i=1,ysize(1)
+    if (injet_y(i,k)) then
+      tt2(i,j,k)=tt2(i,j,k)+scalar_left_jet(j,l)*phi2(i,l,k)
+    else
+      tt2(i,j,k)=tt2(i,j,k)+scalar_left_main(j,l)*phi2(i,l,k)
+    endif
+  enddo
+  enddo
+  enddo
+  enddo
+
+  do k=1,ysize(3)
+  do j=1,ysize(2)
+  do i=1,ysize(1)
     phi2(i,j,k)=tt2(i,j,k)
-enddo
-enddo
-enddo
+  enddo
+  enddo
+  enddo
+#endif
 endif
 ! if (print_flag==1 .and. ystart(1)==1 .and. ystart(3)==1) then
 !   !print *,'dTdy',tt2(1,ny+1:ny*2:4,1)
 !   print *,'T',phi2(1,1:ny:8,1)
 ! endif
-
 
 call transpose_y_to_x(phi2,phi1)
 
@@ -333,7 +357,7 @@ real(mytype), dimension(2*ny,2*ny), intent(out) :: scalar_left
   endif
 
   t2=MPI_WTIME()-t1
-  if (nrank==0) print *,'   - Matrix constructed ',t2,' seconds'
+  if (nrank==0) print *,'      - Matrix constructed ',t2,' seconds'
 !print *,scalar_left
   t1 = MPI_WTIME()
 
@@ -345,7 +369,7 @@ real(mytype), dimension(2*ny,2*ny), intent(out) :: scalar_left
 
   scalar_left=temp
   t2=MPI_WTIME()-t1
-  if (nrank==0) print *,'   - Matrix inversed ',t2,' seconds'
+  if (nrank==0) print *,'      - Matrix inversed ',t2,' seconds'
 
   return
 end subroutine scalar_schemes_exp

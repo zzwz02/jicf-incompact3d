@@ -1,9 +1,9 @@
 #
 # INCOMPACT 3D Flow parameters 
 #
-28.3    #xlx  # Lx (Size of the box in x-direction)
+24.    #xlx  # Lx (Size of the box in x-direction)
 2.     #yly  # Ly (Size of the box in y-direction) 
-6.28    #zlz  # Lz (Size of the box in z-direction) 
+6.    #zlz  # Lz (Size of the box in z-direction) 
 3333   #re   # Reynolds number
 0.7     #sc   # Schmidt number (if passive scalar)
 1.     #u1   # u1 (max velocity) (for inflow condition)
