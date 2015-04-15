@@ -22,15 +22,29 @@ FFTW3_LIB = -L/opt/fftw/3.3.4.0/sandybridge/lib -lfftw3_mpi -lfftw3f_mpi
 # Supply a Fortran pre-processing flag together with optimisation level flags
 # Some examples are given below:
 
-# Intel
-FC = mpif90
+# Intel compiler+Intelmpi
+FC = mpiifort
 OPTFC = -O3 -real-size 32 -funroll-loops -cpp -zero # -opt-report=2
-CC = mpicc
+CC = mpiicc
 CFLAGS = -O3 -zero
 
-#FC =  
-#OPTFC = 
-#CC = 
+# Intel compiler+openmpi
+#FC = mpif90
+#OPTFC = -O3 -real-size 32 -funroll-loops -cpp -zero # -opt-report=2
+#CC = mpicc
+#CFLAGS = -O3 -zero
+
+
+# GNU
+#FC = mpif90
+#OPTFC = -O3 -fdefault-real-8 -funroll-loops -ftree-vectorize -fcray-#pointer -cpp
+#CC = mpicc
+#CFLAGS = -O3
+
+# Cray
+#FC = ftn
+#OPTFC = -e Fm
+#CC = cc
 #CFLAGS = 
 
 # PGI
@@ -44,18 +58,6 @@ CFLAGS = -O3 -zero
 #OPTFC = -Ofast -cpp
 #CC = cc
 #CFLAGS = -O3
-
-# GNU
-#FC = mpif90
-#OPTFC = -O3 -fdefault-real-8 -funroll-loops -ftree-vectorize -fcray-pointer -cpp
-#CC = mpicc
-#CFLAGS = -O3
-
-# Cray
-#FC = ftn
-#OPTFC = -O3 -hfp3 -e Fm -s real32
-#CC = cc
-#CFLAGS = -O3 -hfp3 -e Fm -s real32
 
 #-----------------------------------------------------------------------
 # Normally no need to change anything below
@@ -96,9 +98,9 @@ FreeIPC_c.o: FreeIPC_c.c
 	$(CC) $(CFLAGS) -c $<
 
 incompact3d : $(OBJ)
-	$(FC) -O3 -o $@ $(OBJ) $(LIBFFT) -mkl
-#L/usr/local/lib -llapack -lblas
-
+	$(FC) $(OPTFC) -o $@ $(OBJ) $(LIBFFT) $(N8HPC_LINALG_FFLAGS)
+#-mkl
+#-L/usr/lib64 -llapack -lblas
 %.o : %.f90
 	$(FC) $(OPTFC) $(OPTIONS) $(INC) -c $<
 

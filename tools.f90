@@ -429,6 +429,7 @@ if (irestart==0) then
 endif
 
 if (irestart==0) then
+if (ivirt==0) ep1=0.
 if (ivirt==2) then
    if (nrank==0) print *,'Reading epsilon file done from restart...'
    call MPI_FILE_OPEN(MPI_COMM_WORLD, 'epsilon.dat', &

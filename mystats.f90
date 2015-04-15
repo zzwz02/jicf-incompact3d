@@ -477,8 +477,8 @@ else if (itype==2) then
 
   call MPI_ALLREDUCE(u_tau1,Re_tau1,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
   call MPI_ALLREDUCE(sum1,sum,1,real_type,MPI_SUM,MPI_COMM_WORLD,code)
-  Re_tau1=sqrt(Re_tau1/rezone/nz/2/xnu)
-  sum=sum/rezone/nz/2
+  Re_tau1=sqrt(Re_tau1/nx/nz/2/xnu)
+  sum=sum/nx/nz/2
   if (print_flag==1 .and. nrank==0) print *,'Re_tau',Re_tau1,'top-bottom diff',sum
   
   Re_tau=(Re_tau*(itime-ifirst)+Re_tau1)/(itime-ifirst+1)

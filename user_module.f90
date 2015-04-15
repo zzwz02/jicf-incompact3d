@@ -92,7 +92,6 @@ subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
 #ifdef my_mod_stats
   use user_stats, only : bool_user_stat, beg_stat, &
                          pre_update_user_stats, plot_my_stats
-  use param, only : print_flag
 #endif
 #ifdef my_mod_solide
   use conjugate_ht, only : bool_conjugate_ht, bool_sol_stats, &
@@ -109,7 +108,7 @@ subroutine module_user_write(phG,ph1,ph2,ph3,ph4)
     if (itime.gt.beg_stat) then
       call pre_update_user_stats(phG,ph1,ph2,ph3,ph4)
     endif
-      if (print_flag==1) call plot_my_stats()
+    call plot_my_stats()
   endif
 #endif
 

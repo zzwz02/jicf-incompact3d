@@ -4,7 +4,7 @@ module conjugate_ht
 !
 use decomp_2d, only : mytype, DECOMP_INFO
 use param, only : print_flag
-use variables, only : injet
+use variables, only : injet_y
 
 type(decomp_info), save :: mydecomp_bot, mydecomp_top
 logical, save :: bool_conjugate_ht, bool_sol_stats
@@ -443,7 +443,7 @@ subroutine update_temp_solide()
   ! Derivate in solid is derivate in fluid * fluxratio
   do k=1,ysize(3)
   do i=1,ysize(1)
-    if (injet(i,k)) then
+    if (injet_y(i,k)) then
       ydiff_bot(i,1,k)=1. !-fluxratio_bot
     else
       ydiff_bot(i,1,k)=0. !-fluxratio_bot
@@ -469,7 +469,7 @@ subroutine update_temp_solide()
   if (itype==5 .and. v_jicf>0) then
     do k=1,ysize(3)
     do i=1,ysize(1)
-      if (injet(i,k)) temp_bot(i,:,k)=1.
+      if (injet_y(i,k)) temp_bot(i,:,k)=1.
     enddo
     enddo
     if (ystart(1)==1) then
@@ -801,7 +801,7 @@ subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr,bt)
       do j=3,n+1
       do i=1,ysize(1)
         do l=1,n-1
-          if (injet(i,k)) then
+          if (injet_y(i,k)) then
             temp(i,j,k) = temp(i,j,k) + invdiffy_bot_jet(j-2,l)*( rhs(i,l+2,k) &
                   + ((1.-sol_imp_var)/repr)*dt*d2pn(l+1,  1)* &
                         ( math_jet(1,1)*rhs(i,1,k)+math_jet(1,2)*rhs(i,n+3,k) ) &
@@ -826,7 +826,7 @@ subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr,bt)
       ! Non-homogeneous boundary-condition from fluid
       do k=1,ysize(3)
       do i=1,ysize(1)
-        if (injet(i,k)) then
+        if (injet_y(i,k)) then
           temp(i,2,k)   = math_jet(1,1)*rhs(i,1,k) + math_jet(1,2)*rhs(i,n+3,k)
           temp(i,n+2,k) = math_jet(2,1)*rhs(i,1,k) + math_jet(2,2)*rhs(i,n+3,k)
         else
@@ -840,7 +840,7 @@ subroutine my_new_solid_temp(temp,rhs,invdiffy,d2pn,val,n,cl_b,cl_t,repr,bt)
       do k=1,ysize(3)
       do i=1,ysize(1)
         do j=1,n-1
-          if (injet(i,k)) then
+          if (injet_y(i,k)) then
             temp(i,2,k)   = temp(i,2,k) &
                           + matg_jet(1,j)*temp(i,j+2,k)
             temp(i,n+2,k) = temp(i,n+2,k) &

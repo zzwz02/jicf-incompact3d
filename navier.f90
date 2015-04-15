@@ -618,6 +618,7 @@ enddo
 enddo
 
 ibm_y_max=1
+if (ivirt==0) ep1=0.
 if (ivirt==2) then
    call MPI_FILE_OPEN(MPI_COMM_WORLD, 'epsilon.dat', &
         MPI_MODE_RDONLY, MPI_INFO_NULL, &

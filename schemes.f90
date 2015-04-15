@@ -1230,7 +1230,7 @@ if (iimplicit==0) then
   if (nrank==0) print *,'   begining constructing scalar_left_main Matrix'
   call scalar_schemes_exp(alpha_0,beta_0,alpha_n,beta_n,scalar_left_main)
   if (nrank==0) print *,'   begining constructing scalar_left_jet Matrix'
-  call scalar_schemes_exp(1,0,1,0,scalar_left_jet)
+  call scalar_schemes_exp(1,0,alpha_n,beta_n,scalar_left_jet)
 else
   call implicit_schemes()
   call scalar_schemes(fpi2t)
