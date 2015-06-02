@@ -37,7 +37,7 @@ CFLAGS = -O3 -zero
 
 # GNU
 #FC = mpif90
-#OPTFC = -O3 -fdefault-real-8 -funroll-loops -ftree-vectorize -fcray-#pointer -cpp
+#OPTFC = -O3 -fdefault-real-8 -funroll-loops -ftree-vectorize -fcray-pointer -cpp
 #CC = mpicc
 #CFLAGS = -O3
 
